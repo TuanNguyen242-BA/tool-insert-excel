@@ -1,0 +1,107 @@
+Tóm tắt project: DOCX Template Builder Tool
+Mục đích & Context
+Tool Python (Tkinter GUI) phân tích file Word template và sinh template tùy chỉnh dựa trên config của user. Ứng dụng chính: phân tích file PL01 Viettel "Thiết kế chi tiết CSDL" (26 trang, 2974 từ, 20 bảng) và biến thành template có thể tái sử dụng cho dự án khác.
+File hiện tại: docx_template_builder.py (~3334 dòng), requirements.txt (python-docx, lxml, openpyxl), sample_test_data.xlsx, PHASE_1A_TEST_CASES.md.
+Kiến trúc
+3 class chính:
+
+DocxModel — load/parse XML, manage config dict, generate output
+ExcelSelectionDialog — Tkinter Toplevel để pick content từ Excel
+WizardApp — 7-tab Notebook GUI
+
+7 bước wizard:
+
+Choose file & xác định ranh giới intro/content (heading selector)
+Document defaults & Sections
+Intro section: text replacements + image replacements
+Heading styles, Numbering, Header/Footer
+Heading list (add/delete/reorder, auto-numbering)
+Per-heading action: keep/empty/insert from file
+Generate với progress bar (threading)
+
+Tính năng đã implement
+A. Core (Phase 0)
+
+Schema-aware XML insertion với PPR_ORDER, RPR_ORDER (fix lỗi "Element not expected")
+Page detection dùng <Pages> từ app.xml + Words/300 fallback
+Heading detection scan toàn body, heuristic intro = first H1 ≠ "MỤC LỤC"
+Threading-based generate với 13-step progress callback (sao chép → parse → defaults → sections → styles → text replace → images → headings/content → header/footer → save → zip)
+
+B. Content removal & insertion (Phase 1)
+
+Mode keep_content: True = giữ nguyên, False = xoá content giữa heading và heading kế tiếp BẤT KỲ (any level, không phải same-level)
+Sau khi xoá: chèn 1 paragraph trống pStyle="Normal" để paste vào dễ dàng
+Insert from external Word: clean paragraphs, giữ b/i/u/strike (drop fonts/sizes), inherit từ template doc defaults
+Insert from external Excel: convert thành Word table
+
+C. Excel selection (Phase 1a) — 4 modes
+pythonheading_entry = {
+    'level': 1, 'text': '...', 'original_idx': N,
+    'keep_content': bool,
+    'insert_source': 'path/to/file.xlsx',
+    'insert_selection': {
+        'mode': 'custom'|'all'|'sheet'|'range',
+        'sheet': str,
+        'range': 'A1:D10',          # for mode=range
+        'columns': 'A,C-E,G',       # for mode=custom (text spec, parsed via _parse_column_spec)
+        'row_start': 1,             # for mode=custom
+        'row_end': None|int,        # None = auto-detect last data row
+    },
+    'auto_number': bool,
+}
+Default mode: custom (đặt đầu list). Order modes: custom → range → sheet → all.
+ExcelSelectionDialog UI (820×780): file picker + 4 radio modes + sheet combobox + cột entry (custom) + dòng từ-đến + range entry + "Tự detect" button + Preview Treeview (10 rows) + OK/Cancel với validation.
+D. Critical bug fixes (latest iteration)
+
+Font 11pt issue: Cell runs giờ ALWAYS set explicit <w:rFonts> + <w:sz>, defaults từ doc_defaults. User override qua Step 6: excel_font_name + excel_font_size.
+Auto-detect range trả về A1:A1: 2-stage logic — try ws.calculate_dimension() first, validate via range_boundaries(), fallback to ws.iter_rows() nếu invalid.
+Cell wrap từng ký tự dọc (root cause của bug "S/T/T"):
+
+Đổi tblLayout từ autofit → fixed (Word KHÔNG redistribute)
+Tự đọc page content width từ first sectPr (method _compute_page_content_width) cache vào self._cached_page_width. Trước đây hardcode 9000 nhưng template lề L=3.17/R=2.54 → page = 8666 twips
+Set explicit tcMar = 40/108/40/108 (top/left/bottom/right) tránh inherit margin lớn từ template
+Algorithm col widths mới: TWIPS_PER_CHAR=130, MIN_COL_W=900 (adaptive effective_min = min(900, max(400, page/ncols))), CELL_OVERHEAD=250, scale 3-tier với final adjust top-3 cột wide nhất (tránh negative widths)
+
+
+Custom mode parse: _parse_column_spec() parse A,C-E,G → [1,3,4,5,7]. Mode custom build rows bằng _build_custom_rows(ws, columns, row_from, row_to).
+
+Kết quả verification (test environment)
+CaseMin colMax colTotalStatus7 cột (case Image user)1.53cm3.17cm15.71cm✓ STT không wrap16 cột (extreme)0.83cm1.66cm15.71cm✓ All positive3 cột content dài2.96cm7.65cm15.71cm✓ Email rộng nhất
+Mọi case: schema validation PASSED, font Times New Roman 13pt explicit, tblLayout=fixed, tcMar=40/108/40/108.
+State hiện tại
+File outputs (sẵn sàng cho user test)
+
+docx_template_builder.py (3334 dòng)
+requirements.txt (python-docx>=1.1.0, lxml>=4.9.0, openpyxl>=3.1.0)
+sample_test_data.xlsx (5 sheet: Schema/Indexes/Notes/Empty/SingleCell)
+PHASE_1A_TEST_CASES.md (40+ TC chia 11 nhóm A-K)
+
+Smoke test 10 phút (10 TC ưu tiên)
+TC-A01 load file, TC-A03 file 95 sheet, TC-B01 custom default, TC-B02 cột rời rạc A,C-D, TC-B04 row_end rỗng, TC-C04 ⭐ tự detect không A1:A1, TC-F01 ⭐ default TNR 13pt, TC-F05 preserve bold/italic, TC-G05 ⭐ KHÔNG wrap dọc từng ký tự, TC-K01 mở MS Word
+Todo / Pending
+
+ User testing Phase 1a v3 với file thật (đặc biệt Phụ lục 2_CSDL Cán Bộ_Luồng xử lý Raw-Work.xlsx 95 sheets)
+ Phase 1b: Word selection — đã chốt: "Lấy con cháu của 1 heading cụ thể" + "Lấy từ paragraph N tới paragraph M". Sẽ làm sau khi Phase 1a stable. Cần WordSelectionDialog tương tự với heading dropdown + paragraph range
+ Khả năng Phase 2: named ranges, multi-range, filter conditions, font customization per-insert (hiện chỉ global)
+
+Reference paths quan trọng
+
+Tool source: /mnt/user-data/outputs/docx_template_builder.py
+Test template gốc: /mnt/user-data/uploads/_Upload_được__PL01_Thiet_ke_chi_tiet_CSDL_19032026.docx
+Schema validator: /mnt/skills/public/docx/scripts/office/validate.py
+Skills: /mnt/skills/public/docx/SKILL.md
+
+Phong cách làm việc với user
+
+User là người Việt, dùng tiếng Việt, làm BA/Dev. Chuộng giải pháp tỉ mỉ, không thích quick fix.
+Hay test bằng file Excel thật của Viettel (file 95 sheet, file template PL01)
+Báo lỗi kèm screenshot, mô tả chi tiết Expected vs Actual
+Khi yêu cầu phức tạp, user thích phân phase rõ ràng, đề xuất plan trước rồi mới code
+Test driven: mỗi feature mới yêu cầu test cases đầy đủ + verify validation pass
+
+Hướng dẫn cho conversation mới
+Khi user mở chat mới và gửi 3 thứ này, có thể tiếp tục ngay:
+
+docx_template_builder.py — source code hiện tại
+PHASE_1A_TEST_CASES.md — test cases reference
+Tóm tắt này — context project

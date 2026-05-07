@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DOCX Template Builder Web</title>
+  <style>
+    :root {
+      font-family: "Times New Roman", Times, serif;
+      color: #1f2933;
+      background: #f5f7fa;
+      --line: #d9e2ec;
+      --muted: #52606d;
+      --blue: #0f609b;
+      --blue-dark: #0b4f82;
+      --soft: #eef2f7;
+    }
+    body { margin: 0; }
+    main { max-width: 1280px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 18px; margin: 0 0 12px; }
+    h3 { font-size: 15px; margin: 14px 0 8px; }
+    label { display: block; font-weight: 700; margin: 10px 0 5px; }
+    input, select, textarea, button {
+      box-sizing: border-box;
+      font-family: inherit;
+      font-size: 15px;
+    }
+    input[type=text], input[type=number], select, textarea {
+      width: 100%;
+      padding: 7px 8px;
+      border: 1px solid #bcccdc;
+      border-radius: 6px;
+      background: white;
+    }
+    textarea { min-height: 58px; resize: vertical; }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { border: 1px solid var(--line); padding: 7px; vertical-align: top; }
+    th { background: #f0f4f8; text-align: left; }
+    button {
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--blue);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: var(--blue-dark); }
+    button.secondary { background: #52606d; }
+    button.light { background: #d9e2ec; color: #243b53; }
+    button.danger { background: #b42318; }
+    .meta { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .tab-btn {
+      min-height: 46px;
+      padding: 7px 8px;
+      background: #d9e2ec;
+      color: #243b53;
+      border: 1px solid #bcccdc;
+      text-align: left;
+      font-weight: 700;
+    }
+    .tab-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
+    .panel {
+      display: none;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 560px;
+    }
+    .panel.active { display: block; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .scroll { max-height: 430px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+    .compact th, .compact td { padding: 5px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .footer-nav {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .narrow { width: 84px !important; }
+    .tiny { width: 54px !important; }
+    .check-row {
+      display: grid;
+      grid-template-columns: 24px 64px 1fr;
+      gap: 6px;
+      align-items: start;
+      padding: 5px 4px;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .check-row:last-child { border-bottom: 0; }
+    .columns-box {
+      height: 260px;
+      overflow: auto;
+      border: 1px solid #bcccdc;
+      border-radius: 6px;
+      background: white;
+    }
+    .action-layout {
+      display: grid;
+      grid-template-columns: minmax(520px, 1.2fr) minmax(360px, 0.8fr);
+      gap: 14px;
+    }
+    .summary {
+      white-space: pre-wrap;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      min-height: 260px;
+    }
+    .pill {
+      display: inline-block;
+      min-width: 70px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: #243b53;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .pill.insert { background: #e6f6ff; color: #035388; }
+    .pill.empty { background: #fff3c4; color: #8d2b0b; }
+    @media (max-width: 980px) {
+      .tabs { grid-template-columns: 1fr 1fr; }
+      .grid-2, .grid-3, .action-layout { grid-template-columns: 1fr; }
+      main { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>DOCX Template Builder Web</h1>
+    <div class="meta">
+      Word: <b>{{ docx_name }}</b> · Excel: <b>{{ excel_name }}</b> · {{ pages }} trang · intro index {{ intro }}
+    </div>
+
+    <form id="wizardForm" action="/generate" method="post">
+      <input type="hidden" name="session_id" value="{{ session_id }}">
+      <input type="hidden" id="introEndInput" name="intro_end_idx" value="{{ intro }}">
+      <input type="hidden" id="docDefaultsInput" name="doc_defaults_json">
+      <input type="hidden" id="sectionsInput" name="sections_json">
+      <input type="hidden" id="introReplInput" name="intro_replacements_json">
+      <input type="hidden" id="headingStylesInput" name="heading_styles_json">
+      <input type="hidden" id="headerFooterInput" name="header_footer_text_json">
+      <input type="hidden" id="headingsConfigInput" name="headings_config_json">
+      <input type="hidden" id="preserveInlineInput" name="preserve_inline_formatting" value="true">
+
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab-btn active" data-step="1">1. Chọn file & trang</button>
+        <button type="button" class="tab-btn" data-step="2">2. Defaults & Sections</button>
+        <button type="button" class="tab-btn" data-step="3">3. Phần mở đầu</button>
+        <button type="button" class="tab-btn" data-step="4">4. Headings/H&F</button>
+        <button type="button" class="tab-btn" data-step="5">5. Danh sách heading</button>
+        <button type="button" class="tab-btn" data-step="6">6. Giữ/xoá/chèn</button>
+        <button type="button" class="tab-btn" data-step="7">7. Lưu template</button>
+      </div>
+
+      <section class="panel active" data-panel="1">
+        <h2>Bước 1: Chọn ranh giới phần mở đầu</h2>
+        <div class="grid-2">
+          <div>
+            <label>Heading bắt đầu phần nội dung</label>
+            <select id="introSelect"></select>
+            <p class="muted">Các heading trước dòng này thuộc phần mở đầu; các heading từ dòng này trở đi thuộc nội dung.</p>
+          </div>
+          <div>
+            <label>Thông tin phân tích</label>
+            <div class="summary" id="docInfo"></div>
+          </div>
+        </div>
+        <h3>Danh sách heading phát hiện</h3>
+        <div class="scroll">
+          <table class="compact">
+            <thead><tr><th>Idx</th><th>Level</th><th>Text</th></tr></thead>
+            <tbody id="allHeadingsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="2">
+        <h2>Bước 2: Document defaults & Section properties</h2>
+        <div class="grid-3" id="docDefaultsFields"></div>
+        <h3>Sections</h3>
+        <div class="scroll">
+          <table class="compact">
+            <thead>
+              <tr>
+                <th>Section</th><th>Rộng</th><th>Cao</th><th>Hướng</th>
+                <th>Trên</th><th>Phải</th><th>Dưới</th><th>Trái</th><th>Header</th><th>Footer</th><th>Gutter</th><th>titlePg</th>
+              </tr>
+            </thead>
+            <tbody id="sectionsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="3">
+        <h2>Bước 3: Phần mở đầu</h2>
+        <div class="scroll">
+          <table class="compact">
+            <thead><tr><th style="width:90px">ID</th><th style="width:90px">Loại</th><th>Text gốc</th><th>Text mới</th></tr></thead>
+            <tbody id="introTextBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="4">
+        <h2>Bước 4: Heading styles, Numbering, Header/Footer</h2>
+        <h3>Heading styles</h3>
+        <div class="scroll">
+          <table class="compact">
+            <thead>
+              <tr><th>Style</th><th>Font</th><th>Cỡ</th><th>Bold</th><th>Italic</th><th>Màu</th><th>Before</th><th>After</th></tr>
+            </thead>
+            <tbody id="headingStylesBody"></tbody>
+          </table>
+        </div>
+        <h3>Header/Footer text</h3>
+        <div id="headerFooterFields"></div>
+      </section>
+
+      <section class="panel" data-panel="5">
+        <h2>Bước 5: Danh sách heading</h2>
+        <div class="toolbar">
+          <button type="button" class="light" onclick="addHeading()">+ Thêm heading</button>
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="autoNumberCheck" onchange="syncHeadingAutoNumber()"> Tự động chèn số thứ tự
+          </label>
+        </div>
+        <div class="scroll">
+          <table class="compact">
+            <thead><tr><th style="width:80px">Level</th><th>Text</th><th style="width:170px">Thao tác</th></tr></thead>
+            <tbody id="headingListBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="6">
+        <h2>Bước 6: Giữ, xoá hoặc chèn Excel theo từng heading</h2>
+        <div class="toolbar">
+          <button type="button" class="light" onclick="setAllActions('keep')">Tất cả: Giữ</button>
+          <button type="button" class="light" onclick="setAllActions('empty')">Tất cả: Để trống</button>
+          <label style="display:flex; gap:6px; align-items:center; margin:0 0 0 8px;">
+            <input type="checkbox" id="preserveInlineCheck" checked> Giữ bold/italic/underline từ Excel
+          </label>
+          <div style="width:190px">
+            <label style="margin:0 0 3px">Font Excel</label>
+            <input type="text" name="excel_font_name" value="" placeholder="Times New Roman">
+          </div>
+          <div style="width:110px">
+            <label style="margin:0 0 3px">Cỡ Excel</label>
+            <input type="number" name="excel_font_size" value="11" min="6" max="20" step="0.5">
+          </div>
+        </div>
+        <div class="action-layout">
+          <div class="scroll">
+            <table class="compact">
+              <thead><tr><th style="width:160px">Action</th><th>Heading</th><th style="width:130px">Excel</th></tr></thead>
+              <tbody id="headingActionsBody"></tbody>
+            </table>
+          </div>
+          <div>
+            <h3 id="excelConfigTitle">Cấu hình Excel</h3>
+            <label>Sheet</label>
+            <select id="excelSheetSelect" onchange="changeExcelSheet()"></select>
+            <div class="toolbar">
+              <button type="button" class="light" onclick="selectFirstColumns(7)">Chọn 7 cột đầu</button>
+              <button type="button" class="light" onclick="selectAllColumns()">Chọn tất cả</button>
+              <button type="button" class="light" onclick="clearColumns()">Bỏ chọn</button>
+            </div>
+            <div id="columnList" class="columns-box"></div>
+            <div class="grid-2">
+              <div>
+                <label>Dòng bắt đầu</label>
+                <input type="number" id="rowStartInput" min="1" value="1" onchange="updateSelectedExcelConfig()">
+              </div>
+              <div>
+                <label>Dòng kết thúc</label>
+                <input type="text" id="rowEndInput" placeholder="Rỗng = hết data" onchange="updateSelectedExcelConfig()">
+              </div>
+            </div>
+            <p class="muted">Spec cột: <span id="columnsPreview">(chưa chọn)</span></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="7">
+        <h2>Bước 7: Tổng kết & lưu template</h2>
+        <div class="summary" id="summaryBox"></div>
+        <div class="toolbar" style="justify-content:flex-end">
+          <button type="submit">Generate và tải DOCX</button>
+        </div>
+      </section>
+
+      <div class="footer-nav">
+        <button type="button" class="secondary" onclick="goRelative(-1)">← Trước</button>
+        <button type="button" onclick="goRelative(1)">Tiếp →</button>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    const allHeadings = {{ all_headings | tojson }};
+    const sheets = {{ sheets | tojson }};
+    const initialIntro = {{ intro | tojson }};
+    const initialDefaults = {{ doc_defaults | tojson }};
+    const initialSections = {{ sections | tojson }};
+    const initialHeadingStyles = {{ heading_styles | tojson }};
+    const introTextBlocks = {{ intro_text_blocks | tojson }};
+    const headerFooterText = {{ header_footer_text | tojson }};
+    const naPlaceholderHeadingIndexes = new Set({{ na_placeholder_heading_indexes | default([]) | tojson }});
+    const pages = {{ pages | tojson }};
+
+    let currentStep = 1;
+    let headingsState = [];
+    let selectedExcelHeading = 0;
+
+    const fieldLabels = {
+      font: "Font",
+      size_pt: "Cỡ chữ",
+      lang: "Language",
+      line_spacing: "Line spacing",
+      jc: "Alignment",
+      space_before: "Space before",
+      space_after: "Space after",
+      indent_left_cm: "Indent left"
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function letterFromIndex(n) {
+      let s = "";
+      n = Number(n);
+      while (n > 0) {
+        const m = (n - 1) % 26;
+        s = String.fromCharCode(65 + m) + s;
+        n = Math.floor((n - m) / 26);
+      }
+      return s;
+    }
+
+    function colSpecFromIndexes(indexes) {
+      const sorted = [...new Set(indexes.map(Number).filter(Boolean))].sort((a, b) => a - b);
+      if (!sorted.length) return "";
+      const parts = [];
+      let start = sorted[0], prev = sorted[0];
+      for (const c of sorted.slice(1)) {
+        if (c === prev + 1) { prev = c; continue; }
+        parts.push(start === prev ? letterFromIndex(start) : `${letterFromIndex(start)}:${letterFromIndex(prev)}`);
+        start = prev = c;
+      }
+      parts.push(start === prev ? letterFromIndex(start) : `${letterFromIndex(start)}:${letterFromIndex(prev)}`);
+      return parts.join(",");
+    }
+
+    function indexesFromSpec(spec) {
+      const result = [];
+      for (const raw of String(spec || "").split(",")) {
+        const part = raw.trim().toUpperCase();
+        if (!part) continue;
+        const sep = part.includes(":") ? ":" : part.includes("-") ? "-" : "";
+        const toNum = (letters) => {
+          let n = 0;
+          for (const ch of letters.trim()) n = n * 26 + ch.charCodeAt(0) - 64;
+          return n || null;
+        };
+        if (sep) {
+          const [a, b] = part.split(sep);
+          let start = toNum(a), end = toNum(b);
+          if (!start || !end) continue;
+          if (start > end) [start, end] = [end, start];
+          for (let i = start; i <= end; i++) result.push(i);
+        } else {
+          const n = toNum(part);
+          if (n) result.push(n);
+        }
+      }
+      return result;
+    }
+
+    function sheetByName(name) {
+      return sheets.find(s => s.name === name) || sheets[0] || {name: "", columns: [], header_row: 1};
+    }
+
+    function defaultSelection(sheetName) {
+      const sheet = sheetByName(sheetName || (sheets[0] && sheets[0].name));
+      const defaultCols = colSpecFromIndexes((sheet.columns || []).slice(0, 7).map(c => c.index));
+      return {
+        mode: "custom",
+        sheet: sheet.name || "",
+        columns: defaultCols,
+        row_start: sheet.header_row || 1,
+        row_end: null
+      };
+    }
+
+    function buildInitialHeadings() {
+      const introIdx = Number(document.getElementById("introSelect").value || initialIntro || 0);
+      headingsState = allHeadings
+        .filter(h => Number(h.original_idx) >= introIdx)
+        .map(h => ({
+          level: Number(h.level || 1),
+          text: h.text || "",
+          original_idx: Number(h.original_idx),
+          action: naPlaceholderHeadingIndexes.has(Number(h.original_idx)) ? "empty" : "keep",
+          auto_number: false,
+          insert_selection: defaultSelection()
+        }));
+      selectedExcelHeading = headingsState.length ? 0 : -1;
+      renderHeadingList();
+      renderHeadingActions();
+      renderExcelConfig();
+    }
+
+    function renderIntroStep() {
+      const introSelect = document.getElementById("introSelect");
+      introSelect.innerHTML = "";
+      for (const h of allHeadings) {
+        const opt = document.createElement("option");
+        opt.value = h.original_idx;
+        opt.textContent = `idx ${h.original_idx} · H${h.level} · ${h.text}`;
+        if (Number(h.original_idx) === Number(initialIntro)) opt.selected = true;
+        introSelect.appendChild(opt);
+      }
+      introSelect.addEventListener("change", () => {
+        document.getElementById("introEndInput").value = introSelect.value;
+        buildInitialHeadings();
+        renderAllHeadings();
+      });
+      document.getElementById("docInfo").textContent =
+        `Số trang: ${pages}\nSố heading phát hiện: ${allHeadings.length}\nSố sheet Excel: ${sheets.length}`;
+      renderAllHeadings();
+    }
+
+    function renderAllHeadings() {
+      const introIdx = Number(document.getElementById("introSelect").value || initialIntro || 0);
+      const body = document.getElementById("allHeadingsBody");
+      body.innerHTML = "";
+      for (const h of allHeadings) {
+        const tr = document.createElement("tr");
+        if (Number(h.original_idx) < introIdx) tr.style.color = "#7b8794";
+        tr.innerHTML = `<td>${h.original_idx}</td><td>H${h.level}</td><td>${"&nbsp;".repeat((h.level - 1) * 4)}${escapeHtml(h.text)}</td>`;
+        body.appendChild(tr);
+      }
+    }
+
+    function renderDocDefaults() {
+      const wrap = document.getElementById("docDefaultsFields");
+      wrap.innerHTML = "";
+      for (const [key, label] of Object.entries(fieldLabels)) {
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <label>${label}</label>
+          <input type="text" data-dd="${key}" value="${escapeHtml(initialDefaults[key] ?? "")}">
+        `;
+        wrap.appendChild(div);
+      }
+    }
+
+    function renderSections() {
+      const body = document.getElementById("sectionsBody");
+      body.innerHTML = "";
+      initialSections.forEach((s, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          ${["pg_w_cm", "pg_h_cm"].map(k => `<td><input class="tiny" type="number" step="0.01" data-section="${i}" data-key="${k}" value="${escapeHtml(s[k] ?? "")}"></td>`).join("")}
+          <td>
+            <select data-section="${i}" data-key="orient">
+              <option value="portrait" ${s.orient !== "landscape" ? "selected" : ""}>portrait</option>
+              <option value="landscape" ${s.orient === "landscape" ? "selected" : ""}>landscape</option>
+            </select>
+          </td>
+          ${["top_cm", "right_cm", "bottom_cm", "left_cm", "header_cm", "footer_cm", "gutter_cm"].map(k => `<td><input class="tiny" type="number" step="0.01" data-section="${i}" data-key="${k}" value="${escapeHtml(s[k] ?? "")}"></td>`).join("")}
+          <td style="text-align:center"><input type="checkbox" data-section="${i}" data-key="titlePg" ${s.titlePg ? "checked" : ""}></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function renderIntroText() {
+      const body = document.getElementById("introTextBody");
+      body.innerHTML = "";
+      if (!introTextBlocks.length) {
+        body.innerHTML = `<tr><td colspan="4" class="muted">Không có text phần mở đầu theo mốc hiện tại.</td></tr>`;
+        return;
+      }
+      for (const [idx, kind, text] of introTextBlocks) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(idx)}</td>
+          <td>${escapeHtml(kind)}</td>
+          <td>${escapeHtml(text)}</td>
+          <td><textarea data-intro-old="${escapeHtml(text)}">${escapeHtml(text)}</textarea></td>
+        `;
+        body.appendChild(tr);
+      }
+    }
+
+    function renderHeadingStyles() {
+      const body = document.getElementById("headingStylesBody");
+      body.innerHTML = "";
+      for (let i = 1; i <= 9; i++) {
+        const sid = `Heading${i}`;
+        const s = initialHeadingStyles[sid] || {};
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${sid}</td>
+          <td><input type="text" data-style="${sid}" data-key="font" value="${escapeHtml(s.font || "")}"></td>
+          <td><input class="tiny" type="number" step="0.5" data-style="${sid}" data-key="size_pt" value="${escapeHtml(s.size_pt || 0)}"></td>
+          <td style="text-align:center"><input type="checkbox" data-style="${sid}" data-key="bold" ${s.bold ? "checked" : ""}></td>
+          <td style="text-align:center"><input type="checkbox" data-style="${sid}" data-key="italic" ${s.italic ? "checked" : ""}></td>
+          <td><input class="narrow" type="text" data-style="${sid}" data-key="color" value="${escapeHtml(s.color || "")}"></td>
+          <td><input class="tiny" type="number" step="0.5" data-style="${sid}" data-key="space_before_pt" value="${escapeHtml(s.space_before_pt || 0)}"></td>
+          <td><input class="tiny" type="number" step="0.5" data-style="${sid}" data-key="space_after_pt" value="${escapeHtml(s.space_after_pt || 0)}"></td>
+        `;
+        body.appendChild(tr);
+      }
+    }
+
+    function renderHeaderFooter() {
+      const wrap = document.getElementById("headerFooterFields");
+      wrap.innerHTML = "";
+      const entries = Object.entries(headerFooterText);
+      if (!entries.length) {
+        wrap.innerHTML = `<p class="muted">Không tìm thấy header/footer text.</p>`;
+        return;
+      }
+      for (const [file, text] of entries) {
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <label>${escapeHtml(file)}</label>
+          <textarea data-hf="${escapeHtml(file)}">${escapeHtml(text || "")}</textarea>
+        `;
+        wrap.appendChild(div);
+      }
+    }
+
+    function syncHeadingStateFromTable() {
+      document.querySelectorAll("#headingListBody tr").forEach((tr) => {
+        const i = Number(tr.dataset.idx);
+        if (!headingsState[i]) return;
+        headingsState[i].level = Number(tr.querySelector("[data-h-level]").value || 1);
+        headingsState[i].text = tr.querySelector("[data-h-text]").value || "";
+      });
+    }
+
+    function renderHeadingList() {
+      const body = document.getElementById("headingListBody");
+      body.innerHTML = "";
+      headingsState.forEach((h, i) => {
+        const tr = document.createElement("tr");
+        tr.dataset.idx = i;
+        tr.innerHTML = `
+          <td><input class="tiny" type="number" min="1" max="9" data-h-level value="${h.level}" onchange="syncHeadingStateFromTable(); renderHeadingActions();"></td>
+          <td><input type="text" data-h-text value="${escapeHtml(h.text)}" onchange="syncHeadingStateFromTable(); renderHeadingActions();"></td>
+          <td>
+            <button type="button" class="light" onclick="moveHeading(${i}, -1)">↑</button>
+            <button type="button" class="light" onclick="moveHeading(${i}, 1)">↓</button>
+            <button type="button" class="danger" onclick="deleteHeading(${i})">Xoá</button>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function renderHeadingActions() {
+      syncHeadingStateFromTable();
+      const body = document.getElementById("headingActionsBody");
+      body.innerHTML = "";
+      headingsState.forEach((h, i) => {
+        const indent = "&nbsp;".repeat(Math.max(0, h.level - 1) * 4);
+        const actionClass = h.action === "insert" ? "insert" : h.action === "empty" ? "empty" : "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <select onchange="setHeadingAction(${i}, this.value)">
+              <option value="keep" ${h.action === "keep" ? "selected" : ""}>keep</option>
+              <option value="empty" ${h.action === "empty" ? "selected" : ""}>empty</option>
+              <option value="insert" ${h.action === "insert" ? "selected" : ""}>insert Excel</option>
+            </select>
+          </td>
+          <td>${indent}<span class="pill ${actionClass}">${h.action}</span> H${h.level} · ${escapeHtml(h.text)}</td>
+          <td><button type="button" class="light" onclick="selectExcelHeading(${i})">Cấu hình</button></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function addHeading() {
+      syncHeadingStateFromTable();
+      headingsState.push({
+        level: 1,
+        text: "Heading mới",
+        original_idx: null,
+        action: "empty",
+        auto_number: document.getElementById("autoNumberCheck").checked,
+        insert_selection: defaultSelection()
+      });
+      renderHeadingList();
+      renderHeadingActions();
+    }
+
+    function deleteHeading(i) {
+      syncHeadingStateFromTable();
+      headingsState.splice(i, 1);
+      if (selectedExcelHeading >= headingsState.length) selectedExcelHeading = headingsState.length - 1;
+      renderHeadingList();
+      renderHeadingActions();
+      renderExcelConfig();
+    }
+
+    function moveHeading(i, dir) {
+      syncHeadingStateFromTable();
+      const j = i + dir;
+      if (j < 0 || j >= headingsState.length) return;
+      [headingsState[i], headingsState[j]] = [headingsState[j], headingsState[i]];
+      selectedExcelHeading = j;
+      renderHeadingList();
+      renderHeadingActions();
+      renderExcelConfig();
+    }
+
+    function syncHeadingAutoNumber() {
+      const checked = document.getElementById("autoNumberCheck").checked;
+      headingsState.forEach(h => h.auto_number = checked);
+    }
+
+    function setAllActions(action) {
+      headingsState.forEach(h => h.action = action);
+      renderHeadingActions();
+      renderExcelConfig();
+    }
+
+    function setHeadingAction(i, action) {
+      headingsState[i].action = action;
+      if (action === "insert") {
+        if (!headingsState[i].insert_selection) headingsState[i].insert_selection = defaultSelection();
+        selectedExcelHeading = i;
+      }
+      renderHeadingActions();
+      renderExcelConfig();
+    }
+
+    function selectExcelHeading(i) {
+      if (!headingsState[i]) return;
+      if (headingsState[i].action !== "insert") {
+        headingsState[i].action = "insert";
+      }
+      if (!headingsState[i].insert_selection) {
+        headingsState[i].insert_selection = defaultSelection();
+      }
+      selectedExcelHeading = i;
+      renderHeadingActions();
+      renderExcelConfig();
+    }
+
+    function renderExcelConfig() {
+      const title = document.getElementById("excelConfigTitle");
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") {
+        title.textContent = "Cấu hình Excel";
+        const sheetSelect = document.getElementById("excelSheetSelect");
+        sheetSelect.innerHTML = "";
+        for (const s of sheets) {
+          const opt = document.createElement("option");
+          opt.value = s.name;
+          opt.textContent = s.name;
+          sheetSelect.appendChild(opt);
+        }
+        document.getElementById("columnList").innerHTML = `<div class="muted" style="padding:10px">Chọn action insert Excel cho một heading.</div>`;
+        document.getElementById("columnsPreview").textContent = "(chưa chọn)";
+        return;
+      }
+      h.insert_selection = h.insert_selection || defaultSelection();
+      title.textContent = `Cấu hình Excel: H${h.level} · ${h.text}`;
+
+      const sheetSelect = document.getElementById("excelSheetSelect");
+      sheetSelect.innerHTML = "";
+      for (const s of sheets) {
+        const opt = document.createElement("option");
+        opt.value = s.name;
+        opt.textContent = s.name;
+        if (s.name === h.insert_selection.sheet) opt.selected = true;
+        sheetSelect.appendChild(opt);
+      }
+      if (!h.insert_selection.sheet && sheets[0]) h.insert_selection.sheet = sheets[0].name;
+      document.getElementById("rowStartInput").value = h.insert_selection.row_start || sheetByName(h.insert_selection.sheet).header_row || 1;
+      document.getElementById("rowEndInput").value = h.insert_selection.row_end || "";
+      renderColumnChecks();
+    }
+
+    function renderColumnChecks() {
+      const h = headingsState[selectedExcelHeading];
+      const list = document.getElementById("columnList");
+      if (!h || h.action !== "insert") return;
+      const sheet = sheetByName(h.insert_selection.sheet);
+      const selected = new Set(indexesFromSpec(h.insert_selection.columns));
+      list.innerHTML = "";
+      for (const col of sheet.columns || []) {
+        const row = document.createElement("label");
+        row.className = "check-row";
+        row.innerHTML = `
+          <input type="checkbox" class="col-check" value="${col.index}" ${selected.has(Number(col.index)) ? "checked" : ""} onchange="updateSelectedExcelConfig()">
+          <b>${col.letter}</b>
+          <span>${escapeHtml(col.header)}</span>
+        `;
+        list.appendChild(row);
+      }
+      document.getElementById("columnsPreview").textContent = h.insert_selection.columns || "(chưa chọn)";
+    }
+
+    function changeExcelSheet() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h) return;
+      const sheetName = document.getElementById("excelSheetSelect").value;
+      h.insert_selection = defaultSelection(sheetName);
+      renderExcelConfig();
+    }
+
+    function updateSelectedExcelConfig() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") return;
+      const checked = [...document.querySelectorAll(".col-check:checked")].map(c => c.value);
+      h.insert_selection.mode = "custom";
+      h.insert_selection.sheet = document.getElementById("excelSheetSelect").value;
+      h.insert_selection.columns = colSpecFromIndexes(checked);
+      h.insert_selection.row_start = Number(document.getElementById("rowStartInput").value || 1);
+      h.insert_selection.row_end = document.getElementById("rowEndInput").value.trim() || null;
+      document.getElementById("columnsPreview").textContent = h.insert_selection.columns || "(chưa chọn)";
+    }
+
+    function selectFirstColumns(count) {
+      document.querySelectorAll(".col-check").forEach((c, i) => c.checked = i < count);
+      updateSelectedExcelConfig();
+    }
+
+    function selectAllColumns() {
+      document.querySelectorAll(".col-check").forEach(c => c.checked = true);
+      updateSelectedExcelConfig();
+    }
+
+    function clearColumns() {
+      document.querySelectorAll(".col-check").forEach(c => c.checked = false);
+      updateSelectedExcelConfig();
+    }
+
+    function collectDocDefaults() {
+      const result = {};
+      document.querySelectorAll("[data-dd]").forEach(inp => result[inp.dataset.dd] = inp.value);
+      return result;
+    }
+
+    function collectSections() {
+      return initialSections.map((s, i) => {
+        const out = {...s};
+        document.querySelectorAll(`[data-section="${i}"]`).forEach(inp => {
+          out[inp.dataset.key] = inp.type === "checkbox" ? inp.checked : inp.value;
+        });
+        return out;
+      });
+    }
+
+    function collectIntroReplacements() {
+      const out = {};
+      document.querySelectorAll("[data-intro-old]").forEach(inp => {
+        const oldText = inp.dataset.introOld;
+        if (inp.value !== oldText) out[oldText] = inp.value;
+      });
+      return out;
+    }
+
+    function collectHeadingStyles() {
+      const out = {};
+      document.querySelectorAll("[data-style]").forEach(inp => {
+        const sid = inp.dataset.style;
+        out[sid] = out[sid] || {};
+        out[sid][inp.dataset.key] = inp.type === "checkbox" ? inp.checked : inp.value;
+      });
+      return out;
+    }
+
+    function collectHeaderFooter() {
+      const out = {};
+      document.querySelectorAll("[data-hf]").forEach(inp => out[inp.dataset.hf] = inp.value);
+      return out;
+    }
+
+    function syncHiddenFields() {
+      syncHeadingStateFromTable();
+      syncHeadingAutoNumber();
+      updateSelectedExcelConfig();
+      document.getElementById("introEndInput").value = document.getElementById("introSelect").value;
+      document.getElementById("docDefaultsInput").value = JSON.stringify(collectDocDefaults());
+      document.getElementById("sectionsInput").value = JSON.stringify(collectSections());
+      document.getElementById("introReplInput").value = JSON.stringify(collectIntroReplacements());
+      document.getElementById("headingStylesInput").value = JSON.stringify(collectHeadingStyles());
+      document.getElementById("headerFooterInput").value = JSON.stringify(collectHeaderFooter());
+      document.getElementById("preserveInlineInput").value = document.getElementById("preserveInlineCheck").checked ? "true" : "false";
+      document.getElementById("headingsConfigInput").value = JSON.stringify(headingsState);
+      renderSummary();
+    }
+
+    function renderSummary() {
+      syncHeadingStateFromTable();
+      const insertRows = headingsState.filter(h => h.action === "insert");
+      const emptyRows = headingsState.filter(h => h.action === "empty");
+      const lines = [
+        `Intro start idx: ${document.getElementById("introSelect").value}`,
+        `Headings: ${headingsState.length}`,
+        `Giữ nguyên: ${headingsState.length - insertRows.length - emptyRows.length}`,
+        `Để trống: ${emptyRows.length}`,
+        `Chèn Excel: ${insertRows.length}`,
+        ""
+      ];
+      for (const h of insertRows) {
+        const sel = h.insert_selection || {};
+        lines.push(`- H${h.level} ${h.text}: ${sel.sheet || ""}, cột ${sel.columns || "(chưa chọn)"}, dòng ${sel.row_start || 1}..${sel.row_end || "end"}`);
+      }
+      document.getElementById("summaryBox").textContent = lines.join("\n");
+    }
+
+    function showStep(step) {
+      currentStep = Math.max(1, Math.min(7, step));
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.toggle("active", Number(btn.dataset.step) === currentStep));
+      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", Number(p.dataset.panel) === currentStep));
+      if (currentStep === 6) {
+        renderHeadingActions();
+        renderExcelConfig();
+      }
+      if (currentStep === 7) {
+        syncHiddenFields();
+      }
+    }
+
+    function goRelative(delta) {
+      showStep(currentStep + delta);
+    }
+
+    document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => showStep(Number(btn.dataset.step))));
+    document.getElementById("wizardForm").addEventListener("submit", (event) => {
+      syncHiddenFields();
+      const invalidInsert = headingsState.find(h => h.action === "insert" && !(h.insert_selection && h.insert_selection.columns));
+      if (invalidInsert) {
+        event.preventDefault();
+        showStep(6);
+        alert(`Heading "${invalidInsert.text}" đang insert Excel nhưng chưa chọn cột.`);
+      }
+    });
+
+    renderIntroStep();
+    renderDocDefaults();
+    renderSections();
+    renderIntroText();
+    renderHeadingStyles();
+    renderHeaderFooter();
+    buildInitialHeadings();
+    renderSummary();
+  </script>
+</body>
+</html>

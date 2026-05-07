@@ -1,0 +1,17 @@
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+
+# Không commit dữ liệu thật/upload/output
+*.docx
+*.xlsx
+*.xlsm
+~$*.docx
+~$*.xlsx
+smoke_output_*.docx
+Archive.zip
+
+# Railway/web temp
+.env
+sessions/
