@@ -305,8 +305,8 @@
       </section>
 
       <div class="footer-nav">
-        <button type="button" class="secondary" onclick="goRelative(-1)">← Trước</button>
-        <button type="button" onclick="goRelative(1)">Tiếp →</button>
+        <button type="button" id="prevStepBtn" class="secondary" onclick="goRelative(-1)">← Trước</button>
+        <button type="button" id="nextStepBtn" onclick="goRelative(1)">Tiếp →</button>
       </div>
     </form>
   </main>
@@ -842,6 +842,8 @@
       currentStep = Math.max(1, Math.min(7, step));
       document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.toggle("active", Number(btn.dataset.step) === currentStep));
       document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", Number(p.dataset.panel) === currentStep));
+      document.getElementById("prevStepBtn").hidden = currentStep === 1;
+      document.getElementById("nextStepBtn").hidden = currentStep === 7;
       if (currentStep === 6) {
         renderHeadingActions();
         renderExcelConfig();
@@ -874,6 +876,7 @@
     renderHeaderFooter();
     buildInitialHeadings();
     renderSummary();
+    showStep(1);
   </script>
 </body>
 </html>
