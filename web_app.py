@@ -52,6 +52,13 @@ app = FastAPI(title="DOCX Template Builder Web")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+def render_template(request: Request, name: str, context: dict | None = None):
+    """Render template theo signature mới của Starlette/Jinja2Templates."""
+    data = dict(context or {})
+    data["request"] = request
+    return templates.TemplateResponse(request=request, name=name, context=data)
+
+
 def safe_filename(name: str) -> str:
     clean = re.sub(r"[^A-Za-z0-9_.() \-\[\]\u00C0-\u1EF9]+", "_", name or "file")
     return clean[:180] or "file"
@@ -413,7 +420,7 @@ def build_headings_config(raw_headings, excel_path: Path):
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return render_template(request, "index.html")
 
 
 @app.post("/configure", response_class=HTMLResponse)
@@ -438,10 +445,10 @@ async def configure(
     if cloud_mode():
         upload_cloud_session(sid, docx_path, excel_path)
 
-    return templates.TemplateResponse(
+    return render_template(
+        request,
         "configure.html",
         {
-            "request": request,
             "session_id": sid,
             "docx_name": docx_path.name,
             "excel_name": excel_path.name,
@@ -501,13 +508,7 @@ def submit_cloud_generation(request: Request, session_id: str, payload: dict):
     except Exception as exc:
         store.update(job_id, status="failed", error=str(exc), message="Không gọi được Cloud Run Job")
 
-    return templates.TemplateResponse(
-        "job_status.html",
-        {
-            "request": request,
-            "job_id": job_id,
-        },
-    )
+    return render_template(request, "job_status.html", {"job_id": job_id})
 
 
 @app.post("/generate")
@@ -559,13 +560,7 @@ async def generate(
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
 def job_page(request: Request, job_id: str):
-    return templates.TemplateResponse(
-        "job_status.html",
-        {
-            "request": request,
-            "job_id": job_id,
-        },
-    )
+    return render_template(request, "job_status.html", {"job_id": job_id})
 
 
 @app.get("/jobs/{job_id}/status")
