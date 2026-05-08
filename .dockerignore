@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+*.pyc
+.DS_Store
+.env
+.env.*
+*.docx
+*.xlsx
+*.xlsm
+*.zip
+sessions/

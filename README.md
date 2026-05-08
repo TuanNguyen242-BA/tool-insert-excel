@@ -18,3 +18,5 @@ http://127.0.0.1:8001/
 ## Deploy
 
 Project co san `Procfile`, `runtime.txt`, `requirements.txt` de deploy len Railway/Heroku-style platform.
+
+Voi file Excel lon, dung kien truc Google Cloud Run Service + Cloud Run Jobs. Xem chi tiet trong `DEPLOY_GCP.md`.

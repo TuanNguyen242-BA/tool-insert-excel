@@ -13,6 +13,22 @@ from fastapi.templating import Jinja2Templates
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
+from cloud_run_executor import execute_worker_job
+from generation_service import (
+    GenerationConfigError,
+    generate_docx_from_payload,
+    payload_from_form,
+    validate_payload,
+)
+from job_store import get_job_store
+from storage_backend import (
+    GCSStorage,
+    cloud_mode,
+    job_manifest_object,
+    job_output_object,
+    session_manifest_object,
+)
+
 
 BASE_DIR = Path(__file__).resolve().parent
 SESSIONS_DIR = Path(os.getenv("DOCX_BUILDER_SESSIONS", tempfile.gettempdir())) / "docx_builder_web"
@@ -57,6 +73,41 @@ def save_upload(upload: UploadFile, dst_dir: Path) -> Path:
     return dst
 
 
+def upload_cloud_session(session_id: str, docx_path: Path, excel_path: Path):
+    storage = GCSStorage()
+    docx_object = f"sessions/{session_id}/{docx_path.name}"
+    excel_object = f"sessions/{session_id}/{excel_path.name}"
+    storage.upload_file(
+        docx_path,
+        docx_object,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    storage.upload_file(
+        excel_path,
+        excel_object,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    manifest = {
+        "session_id": session_id,
+        "docx_name": docx_path.name,
+        "excel_name": excel_path.name,
+        "docx_object": docx_object,
+        "excel_object": excel_object,
+    }
+    storage.upload_json(session_manifest_object(session_id), manifest)
+    return manifest
+
+
+def load_cloud_session(session_id: str):
+    if not re.fullmatch(r"[a-f0-9-]{36}", session_id):
+        raise HTTPException(status_code=400, detail="Session không hợp lệ")
+    storage = GCSStorage()
+    try:
+        return storage.download_json(session_manifest_object(session_id))
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="Session cloud không tồn tại") from exc
+
+
 def detect_header_row(ws):
     max_scan = min(ws.max_row or 1, 50)
     max_col = 1
@@ -96,13 +147,15 @@ def detect_header_row(ws):
 
 
 def excel_metadata(path: Path):
-    wb = load_workbook(path, read_only=False, data_only=True)
+    wb = load_workbook(path, read_only=True, data_only=True)
     sheets = []
     for ws in wb.worksheets:
-        header_row, max_col = detect_header_row(ws)
+        preview_rows = list(ws.iter_rows(min_row=1, max_row=50, values_only=True))
+        header_row, max_col = detect_header_row_from_values(preview_rows, ws.max_column or 1)
+        header_values = preview_rows[header_row - 1] if header_row - 1 < len(preview_rows) else ()
         columns = []
         for c in range(1, max_col + 1):
-            header = ws.cell(row=header_row, column=c).value
+            header = header_values[c - 1] if c - 1 < len(header_values) else None
             header_text = str(header).strip() if header is not None else ""
             if not header_text:
                 continue
@@ -119,6 +172,34 @@ def excel_metadata(path: Path):
         })
     wb.close()
     return sheets
+
+
+def detect_header_row_from_values(rows, max_col_hint=1):
+    max_col = max([len(row or ()) for row in rows] + [max_col_hint or 1])
+    best_row = 1
+    best_score = -1
+    for idx, row in enumerate(rows, start=1):
+        nonempty = 0
+        text_cells = 0
+        numeric_cells = 0
+        total_text_len = 0
+        for c in range(max_col):
+            v = row[c] if row and c < len(row) else None
+            if v is None or str(v).strip() == "":
+                continue
+            nonempty += 1
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                numeric_cells += 1
+            else:
+                text_cells += 1
+                total_text_len += min(len(str(v).strip()), 40)
+        if nonempty < 2:
+            continue
+        score = nonempty * 10 + text_cells * 6 + total_text_len - numeric_cells * 8
+        if score > best_score:
+            best_score = score
+            best_row = idx
+    return best_row, max_col
 
 
 def load_docx_metadata(path: Path):
@@ -354,6 +435,8 @@ async def configure(
     excel_path = save_upload(excel_file, sdir)
     meta = load_docx_metadata(docx_path)
     sheets = excel_metadata(excel_path)
+    if cloud_mode():
+        upload_cloud_session(sid, docx_path, excel_path)
 
     return templates.TemplateResponse(
         "configure.html",
@@ -373,12 +456,63 @@ async def configure(
             "intro_text_blocks": meta["intro_text_blocks"],
             "header_footer_text": meta["header_footer_text"],
             "na_placeholder_heading_indexes": meta["na_placeholder_heading_indexes"],
+            "cloud_mode": cloud_mode(),
+        },
+    )
+
+
+def submit_cloud_generation(request: Request, session_id: str, payload: dict):
+    session_manifest = load_cloud_session(session_id)
+    job_id = str(uuid.uuid4())
+    output_name = f"{Path(session_manifest['docx_name']).stem}_web_template.docx"
+    output_object = job_output_object(job_id, output_name)
+    manifest = {
+        "job_id": job_id,
+        "session_id": session_id,
+        "docx_name": session_manifest["docx_name"],
+        "excel_name": session_manifest["excel_name"],
+        "docx_object": session_manifest["docx_object"],
+        "excel_object": session_manifest["excel_object"],
+        "output_name": output_name,
+        "output_object": output_object,
+        "payload": payload,
+    }
+
+    storage = GCSStorage()
+    storage.upload_json(job_manifest_object(job_id), manifest)
+
+    store = get_job_store()
+    store.create(
+        job_id,
+        {
+            "status": "queued",
+            "progress": 0,
+            "message": "Đã tạo job",
+            "session_id": session_id,
+            "docx_name": session_manifest["docx_name"],
+            "excel_name": session_manifest["excel_name"],
+            "output_name": output_name,
+            "output_object": output_object,
+        },
+    )
+    try:
+        operation = execute_worker_job(job_id)
+        store.update(job_id, status="submitted", operation=operation.get("name", ""))
+    except Exception as exc:
+        store.update(job_id, status="failed", error=str(exc), message="Không gọi được Cloud Run Job")
+
+    return templates.TemplateResponse(
+        "job_status.html",
+        {
+            "request": request,
+            "job_id": job_id,
         },
     )
 
 
 @app.post("/generate")
 async def generate(
+    request: Request,
     session_id: str = Form(...),
     intro_end_idx: str = Form(""),
     doc_defaults_json: str = Form("{}"),
@@ -391,72 +525,77 @@ async def generate(
     excel_font_name: str = Form(""),
     excel_font_size: float = Form(11),
 ):
+    try:
+        payload = payload_from_form(
+            intro_end_idx=intro_end_idx,
+            doc_defaults_json=doc_defaults_json,
+            sections_json=sections_json,
+            intro_replacements_json=intro_replacements_json,
+            heading_styles_json=heading_styles_json,
+            header_footer_text_json=header_footer_text_json,
+            headings_config_json=headings_config_json,
+            preserve_inline_formatting=preserve_inline_formatting,
+            excel_font_name=excel_font_name,
+            excel_font_size=excel_font_size,
+        )
+        validate_payload(payload)
+    except GenerationConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if cloud_mode():
+        return submit_cloud_generation(request, session_id, payload)
+
     sdir = session_dir(session_id)
     docx_path, excel_path = find_session_sources(sdir)
-    meta = load_docx_metadata(docx_path)
-    model = meta["model"]
-
-    intro_idx = as_int(intro_end_idx, model.get_intro_end_idx())
-    model.config["intro_end_idx"] = max(0, intro_idx or 0)
-
-    apply_doc_defaults_config(
-        model,
-        parse_json_form(doc_defaults_json, {}, "Document defaults"),
-    )
-    apply_sections_config(
-        model,
-        parse_json_form(sections_json, [], "Sections"),
-    )
-    intro_replacements = parse_json_form(
-        intro_replacements_json, {}, "Intro replacements"
-    )
-    if isinstance(intro_replacements, dict):
-        model.config["intro_replacements"] = {
-            str(k): str(v)
-            for k, v in intro_replacements.items()
-            if str(k) != str(v)
-        }
-    apply_heading_styles_config(
-        model,
-        parse_json_form(heading_styles_json, {}, "Heading styles"),
-    )
-    header_footer_text = parse_json_form(
-        header_footer_text_json, {}, "Header/Footer"
-    )
-    if isinstance(header_footer_text, dict):
-        model.config["header_footer_text"] = {
-            str(k): str(v)
-            for k, v in header_footer_text.items()
-        }
-
-    headings_payload = parse_json_form(
-        headings_config_json, [], "Danh sách heading"
-    )
-    headings_list = build_headings_config(headings_payload, excel_path)
-    if not headings_list:
-        headings_list = [
-            {
-                **h,
-                "keep_content": True,
-                "insert_source": None,
-                "insert_selection": None,
-                "auto_number": False,
-            }
-            for h in model.get_all_headings()
-            if h["original_idx"] >= model.config["intro_end_idx"]
-        ]
-    model.config["headings_list"] = headings_list
-    model.config["preserve_inline_formatting"] = as_bool(preserve_inline_formatting, True)
-    model.config["excel_font_name"] = excel_font_name.strip()
-    model.config["excel_font_size"] = excel_font_size or 11
 
     out_path = sdir / f"{docx_path.stem}_web_template.docx"
-    model.generate(str(out_path))
+    generate_docx_from_payload(docx_path, excel_path, out_path, payload)
     return FileResponse(
         out_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=out_path.name,
     )
+
+
+@app.get("/jobs/{job_id}", response_class=HTMLResponse)
+def job_page(request: Request, job_id: str):
+    return templates.TemplateResponse(
+        "job_status.html",
+        {
+            "request": request,
+            "job_id": job_id,
+        },
+    )
+
+
+@app.get("/jobs/{job_id}/status")
+def job_status(job_id: str):
+    record = get_job_store().get(job_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Job không tồn tại")
+    return record
+
+
+@app.get("/jobs/{job_id}/download")
+def job_download(job_id: str):
+    record = get_job_store().get(job_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Job không tồn tại")
+    if record.get("status") != "done":
+        raise HTTPException(status_code=409, detail="Job chưa hoàn tất")
+    output_name = record.get("output_name") or f"{job_id}.docx"
+    if cloud_mode():
+        output_object = record.get("output_object")
+        if not output_object:
+            raise HTTPException(status_code=404, detail="Không tìm thấy output")
+        dst = SESSIONS_DIR / "job_downloads" / job_id / safe_filename(output_name)
+        GCSStorage().download_file(output_object, dst)
+        return FileResponse(
+            dst,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename=output_name,
+        )
+    raise HTTPException(status_code=400, detail="Download job chỉ dùng ở cloud mode")
 
 
 @app.get("/health")

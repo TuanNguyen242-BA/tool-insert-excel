@@ -300,7 +300,7 @@
         <h2>Bước 7: Tổng kết & lưu template</h2>
         <div class="summary" id="summaryBox"></div>
         <div class="toolbar" style="justify-content:flex-end">
-          <button type="submit">Generate và tải DOCX</button>
+          <button type="submit">{% if cloud_mode %}Tạo job generate{% else %}Generate và tải DOCX{% endif %}</button>
         </div>
       </section>
 

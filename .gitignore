@@ -11,7 +11,10 @@ __pycache__/
 ~$*.xlsx
 smoke_output_*.docx
 Archive.zip
+*.zip
 
 # Railway/web temp
 .env
+.env.*
+!.env.example
 sessions/
