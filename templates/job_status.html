@@ -13,7 +13,9 @@
     .muted { color: #52606d; }
     .bar { height: 14px; background: #d9e2ec; border-radius: 999px; overflow: hidden; margin: 16px 0; }
     .fill { height: 100%; width: 0; background: #0f609b; transition: width .2s ease; }
-    a, button { display: inline-block; margin-top: 12px; padding: 9px 14px; border-radius: 6px; background: #0f609b; color: white; text-decoration: none; border: 0; font-weight: 700; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    a, button { display: inline-block; padding: 9px 14px; border-radius: 6px; background: #0f609b; color: white; text-decoration: none; border: 0; font-weight: 700; }
+    a.secondary { background: #52606d; }
     pre { white-space: pre-wrap; background: #f8fafc; border: 1px solid #d9e2ec; padding: 10px; border-radius: 6px; }
   </style>
 </head>
@@ -25,8 +27,9 @@
       <div class="bar"><div class="fill" id="progressFill"></div></div>
       <p id="statusText">Đang lấy trạng thái...</p>
       <p id="messageText" class="muted"></p>
-      <div id="downloadBox" style="display:none">
-        <a href="/jobs/{{ job_id }}/download">Tải file DOCX</a>
+      <div class="actions">
+        <a id="downloadLink" href="/jobs/{{ job_id }}/download" style="display:none">Tải file DOCX</a>
+        <a class="secondary" href="/">Tạo file khác</a>
       </div>
       <pre id="errorBox" style="display:none"></pre>
     </section>
@@ -48,7 +51,7 @@
       document.getElementById("messageText").textContent = data.message || "";
 
       if (status === "done") {
-        document.getElementById("downloadBox").style.display = "block";
+        document.getElementById("downloadLink").style.display = "inline-block";
         return;
       }
       if (status === "failed") {

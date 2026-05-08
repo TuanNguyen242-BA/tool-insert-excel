@@ -196,11 +196,14 @@ gcloud run deploy tool-insert-excel-web \
   --allow-unauthenticated \
   --cpu 2 \
   --memory 2Gi \
+  --min-instances 1 \
   --timeout 3600 \
   --set-env-vars "DOCX_BUILDER_MODE=cloud,PROJECT_ID=${PROJECT_ID},REGION=${REGION},GCS_BUCKET=${BUCKET},WORKER_JOB_NAME=tool-insert-excel-worker,FIRESTORE_JOBS_COLLECTION=docx_jobs,WORKER_TASK_TIMEOUT=7200s"
 ```
 
 Lenh se in ra URL cua web. Mo URL do de upload file va generate.
+
+`--min-instances 1` giu web service luon am de mo trang nhanh hon. Cloud Run Job worker van co thoi gian khoi dong rieng khi bam generate; neu muon tiet kiem chi phi web idle, co the doi ve `--min-instances 0`.
 
 ## C. Kiem tra va debug
 

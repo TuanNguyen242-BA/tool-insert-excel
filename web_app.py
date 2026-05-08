@@ -504,7 +504,13 @@ def submit_cloud_generation(request: Request, session_id: str, payload: dict):
     )
     try:
         operation = execute_worker_job(job_id)
-        store.update(job_id, status="submitted", operation=operation.get("name", ""))
+        store.update(
+            job_id,
+            status="submitted",
+            progress=1,
+            message="Đã gửi job, đang chờ worker khởi động",
+            operation=operation.get("name", ""),
+        )
     except Exception as exc:
         store.update(job_id, status="failed", error=str(exc), message="Không gọi được Cloud Run Job")
 
