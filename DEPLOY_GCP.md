@@ -188,6 +188,37 @@ gcloud run jobs add-iam-policy-binding tool-insert-excel-worker \
 
 ### 5. Deploy Cloud Run Service web
 
+Khuyen nghi dung script deploy de moi lan chi lay 1 URL chuan tu Cloud Run service:
+
+```bash
+cd "/Users/nguyenchinh/Desktop/demo"
+
+export PROJECT_ID="my-project-242224"
+export REGION="asia-southeast1"
+export BUCKET="${PROJECT_ID}-docx-builder"
+
+bash scripts/deploy_web.sh
+```
+
+Script se:
+
+- build va push image moi;
+- deploy service `tool-insert-excel-web`;
+- ep 100% traffic ve revision moi nhat, khong route sang ban cu;
+- in ra duy nhat URL chuan o dong `WEB_URL=...`.
+
+URL chuan luon lay bang lenh nay:
+
+```bash
+gcloud run services describe tool-insert-excel-web \
+  --region "$REGION" \
+  --format='value(status.url)'
+```
+
+Neu output cua `gcloud run deploy` co hien them mot URL khac, bo qua URL do va chi dung `WEB_URL` ma script in ra.
+
+Lenh deploy thu cong tuong duong:
+
 ```bash
 gcloud run deploy tool-insert-excel-web \
   --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/tool-insert-excel/app:latest" \
@@ -199,11 +230,23 @@ gcloud run deploy tool-insert-excel-web \
   --min-instances 1 \
   --timeout 3600 \
   --set-env-vars "DOCX_BUILDER_MODE=cloud,PROJECT_ID=${PROJECT_ID},REGION=${REGION},GCS_BUCKET=${BUCKET},WORKER_JOB_NAME=tool-insert-excel-worker,FIRESTORE_JOBS_COLLECTION=docx_jobs,WORKER_TASK_TIMEOUT=7200s"
+
+gcloud run services update-traffic tool-insert-excel-web \
+  --region "$REGION" \
+  --to-latest
 ```
 
-Lenh se in ra URL cua web. Mo URL do de upload file va generate.
+Mo URL chuan tu `gcloud run services describe ... status.url` de upload file va generate.
 
 `--min-instances 1` giu web service luon am de mo trang nhanh hon. Cloud Run Job worker van co thoi gian khoi dong rieng khi bam generate; neu muon tiet kiem chi phi web idle, co the doi ve `--min-instances 0`.
+
+Neu muon xoa cac revision cu khong con nhan traffic sau khi deploy, chay:
+
+```bash
+DELETE_OLD_REVISIONS=1 bash scripts/deploy_web.sh
+```
+
+Chi dung tuy chon nay khi chac chan khong can rollback nhanh ve ban cu.
 
 ## C. Kiem tra va debug
 
