@@ -3,30 +3,35 @@ import tempfile
 import traceback
 from pathlib import Path
 
-from generation_service import generate_docx_from_payload
-from job_store import get_job_store
-from storage_backend import GCSStorage, job_manifest_object
-
 
 def main():
     job_id = os.getenv("JOB_ID", "").strip()
     if not job_id:
         raise RuntimeError("Thiếu biến môi trường JOB_ID")
 
+    from job_store import get_job_store
+    from storage_backend import GCSStorage, job_manifest_object
+
     store = get_job_store()
-    storage = GCSStorage()
     workdir = Path(tempfile.mkdtemp(prefix=f"docx_job_{job_id}_"))
 
     try:
-        store.update(job_id, status="running", error="")
+        store.update(job_id, status="running", progress=2, message="Worker đã khởi động", error="")
+
+        storage = GCSStorage()
+        store.update(job_id, status="running", progress=4, message="Đang tải cấu hình job")
         manifest = storage.download_json(job_manifest_object(job_id))
 
         docx_path = workdir / manifest["docx_name"]
         excel_path = workdir / manifest["excel_name"]
         output_path = workdir / manifest["output_name"]
 
+        store.update(job_id, status="running", progress=6, message="Đang tải file đầu vào")
         storage.download_file(manifest["docx_object"], docx_path)
         storage.download_file(manifest["excel_object"], excel_path)
+
+        store.update(job_id, status="running", progress=8, message="Đang nạp engine generate")
+        from generation_service import generate_docx_from_payload
 
         def progress(percent, message):
             store.update(job_id, status="running", progress=percent, message=message)

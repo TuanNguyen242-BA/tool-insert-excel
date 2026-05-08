@@ -508,7 +508,7 @@ def submit_cloud_generation(request: Request, session_id: str, payload: dict):
             job_id,
             status="submitted",
             progress=1,
-            message="Đã gửi job, đang chờ worker khởi động",
+            message="Đã gửi job, Cloud Run đang cấp worker mới (thường 15-30 giây)",
             operation=operation.get("name", ""),
         )
     except Exception as exc:
