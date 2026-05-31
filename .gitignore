@@ -2,11 +2,16 @@
 __pycache__/
 *.pyc
 .venv/
+.venv_old_linux/
+local_server.*.log
 
 # Không commit dữ liệu thật/upload/output
 *.docx
 *.xlsx
 *.xlsm
+!ulnl_tool/resources/*.xlsx
+!ulnl_tool/resources/*.xlsm
+!ulnl_tool/resources/*.png
 ~$*.docx
 ~$*.xlsx
 smoke_output_*.docx
@@ -18,3 +23,7 @@ Archive.zip
 .env.*
 !.env.example
 sessions/
+
+# Optional local LibreOffice bundle for preview. Keep binaries out of git.
+tools/libreoffice/
+tools/LibreOfficePortable/
