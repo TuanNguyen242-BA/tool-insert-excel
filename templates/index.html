@@ -3,37 +3,237 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DOCX Template Builder Web</title>
+  <title>Solution Hub</title>
   <style>
-    :root { font-family: "Times New Roman", Times, serif; color: #1f2933; background: #f5f7fa; }
-    body { margin: 0; }
-    main { max-width: 980px; margin: 0 auto; padding: 28px; }
-    h1 { font-size: 24px; margin: 0 0 18px; }
-    section { background: white; border: 1px solid #d9e2ec; border-radius: 8px; padding: 22px; }
-    label { display: block; font-weight: 600; margin: 16px 0 6px; }
-    input[type=file] { width: 100%; padding: 10px; border: 1px solid #bcccdc; border-radius: 6px; background: #fff; }
-    button { margin-top: 22px; padding: 10px 16px; border: 0; border-radius: 6px; background: #0f609b; color: white; font-weight: 700; cursor: pointer; }
-    .hint { color: #52606d; font-size: 14px; line-height: 1.5; }
+    :root {
+      font-family: "Times New Roman", Times, serif;
+      color: #1f2933;
+      background: #f5f7fa;
+      --line: #d9e2ec;
+      --muted: #52606d;
+      --blue: #0f609b;
+      --blue-dark: #0b4f82;
+      --soft: #eef2f7;
+      --green: #2f8132;
+      --amber: #b7791f;
+    }
+    body { margin: 0; min-height: 100vh; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 42px; }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    .hint { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0; }
+    .shell {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 16px;
+    }
+    h2 { font-size: 18px; margin: 0; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: #243b53;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .tools {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .tool-card {
+      box-sizing: border-box;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 230px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: #1f2933;
+      text-decoration: none;
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+    .tool-card:hover {
+      border-color: #8fb8d8;
+      box-shadow: 0 12px 30px rgba(31, 41, 51, 0.12);
+      transform: translateY(-1px);
+    }
+    .tool-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: #e6f2fb;
+      color: var(--blue);
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .mark.green { background: #e3f9e5; color: var(--green); }
+    .mark.amber { background: #fffbea; color: var(--amber); }
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .tool-card h3 {
+      font-size: 18px;
+      margin: 0 0 8px;
+      color: #102a43;
+    }
+    .tool-card p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+      margin: 0;
+    }
+    .open-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding-top: 14px;
+      margin-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--blue);
+      font-weight: 700;
+    }
+    .arrow {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: var(--blue);
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    .footnote {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+    @media (max-width: 920px) {
+      main { padding: 16px 12px 28px; }
+      .top, .section-head { flex-direction: column; align-items: flex-start; }
+      .tools { grid-template-columns: 1fr; }
+      .tool-card { min-height: 190px; }
+      .footnote { text-align: left; }
+    }
   </style>
 </head>
 <body>
   <main>
-    <h1>DOCX Template Builder Web</h1>
-    <section>
-      <form action="/configure" method="post" enctype="multipart/form-data">
-        <label>File Word template (.docx)</label>
-        <input type="file" name="docx_file" accept=".docx" required>
+    <div class="top">
+      <div>
+        <h1>Solution Hub</h1>
+        <p class="hint">Chọn công cụ cần sử dụng trong bộ workflow tài liệu, CSDL và ước lượng nỗ lực.</p>
+      </div>
+      <span class="badge">4 module</span>
+    </div>
 
-        <label>File Excel dữ liệu (.xlsx/.xlsm)</label>
-        <input type="file" name="excel_file" accept=".xlsx,.xlsm" required>
+    <section class="shell">
+      <div class="section-head">
+        <h2>Lựa chọn công cụ</h2>
+        <span class="hint">Các module chạy độc lập theo từng luồng xử lý.</span>
+      </div>
 
-        <p class="hint">
-          Bản web dùng luồng 7 bước: xác định phần mở đầu, kiểm tra defaults/sections,
-          chỉnh heading, chọn nội dung giữ/xoá/chèn theo từng heading, rồi tải DOCX đã generate.
-        </p>
-        <button type="submit">Phân tích file</button>
-      </form>
+      <nav class="tools" aria-label="Chọn module">
+        <a class="tool-card" href="/tktkl">
+          <div class="tool-top">
+            <span class="mark">TK</span>
+            <span class="status">Template</span>
+          </div>
+          <div>
+            <h3>Xây dựng tài liệu</h3>
+            <p>Tạo tài liệu từ template Word và dữ liệu Excel theo luồng cấu hình nhiều bước.</p>
+          </div>
+          <div class="open-row">
+            <span>Mở công cụ</span>
+            <span class="arrow">›</span>
+          </div>
+        </a>
+
+        <a class="tool-card" href="/csdl">
+          <div class="tool-top">
+            <span class="mark green">DB</span>
+            <span class="status">DQC / STD</span>
+          </div>
+          <div>
+            <h3>Phân tích cơ sở dữ liệu</h3>
+            <p>Phân tích tài liệu thiết kế CSDL, gán rule và tạo file Excel DQC/STD.</p>
+          </div>
+          <div class="open-row">
+            <span>Mở công cụ</span>
+            <span class="arrow">›</span>
+          </div>
+        </a>
+
+        <a class="tool-card" href="/ulnl">
+          <div class="tool-top">
+            <span class="mark amber">NL</span>
+            <span class="status">ULNL</span>
+          </div>
+          <div>
+            <h3>Xây dựng Ước lượng nỗ lực</h3>
+            <p>Import danh sách chức năng, cấu hình rule mã CN và build file ULNL Excel.</p>
+          </div>
+          <div class="open-row">
+            <span>Mở công cụ</span>
+            <span class="arrow">›</span>
+          </div>
+        </a>
+
+        <a class="tool-card" href="/data-zone">
+          <div class="tool-top">
+            <span class="mark green">DZ</span>
+            <span class="status">Raw / Work</span>
+          </div>
+          <div>
+            <h3>Mô tả dữ liệu phân vùng</h3>
+            <p>Tạo hai phụ lục Excel mô tả Raw Zone và Work Zone từ file nguồn dữ liệu.</p>
+          </div>
+          <div class="open-row">
+            <span>Mở công cụ</span>
+            <span class="arrow">›</span>
+          </div>
+        </a>
+      </nav>
     </section>
+
+    <p class="footnote">solutionhub-bitaaxnokq-as.a.run.app</p>
   </main>
 </body>
 </html>

@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ULNL Builder</title>
+  <style>
+    :root {
+      font-family: "Times New Roman", Times, serif;
+      color: #1f2933;
+      background: #f5f7fa;
+      --line: #d9e2ec;
+      --muted: #52606d;
+      --blue: #0f609b;
+      --blue-dark: #0b4f82;
+      --soft: #eef2f7;
+    }
+    body { margin: 0; padding-bottom: 88px; }
+    main { max-width: 1280px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 18px; margin: 0 0 12px; }
+    h3 { font-size: 15px; margin: 14px 0 8px; }
+    label { display: block; font-weight: 700; margin: 10px 0 5px; }
+    input, select, textarea, button { box-sizing: border-box; font-family: inherit; font-size: 15px; }
+    input[type=file], input[type=text], input[type=number], input[type=color], textarea, select {
+      width: 100%; padding: 7px 8px; border: 1px solid #bcccdc; border-radius: 6px; background: #fff;
+    }
+    input[type=checkbox] { width: 16px; height: 16px; }
+    textarea { min-height: 58px; resize: vertical; font-family: Consolas, monospace; font-size: 13px; }
+    button, a.button {
+      display: inline-block; padding: 8px 12px; border: 0; border-radius: 6px; background: var(--blue);
+      color: white; font-weight: 700; cursor: pointer; text-decoration: none;
+    }
+    button:hover, a.button:hover { background: var(--blue-dark); }
+    button.secondary, a.secondary { background: #52606d; }
+    button.light, button.ghost { background: #d9e2ec; color: #243b53; }
+    button.danger { background: #b42318; }
+    button:disabled { background: #bcccdc; cursor: not-allowed; }
+    .icon-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-start; }
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .hint, .muted { color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .step {
+      box-sizing: border-box;
+      height: 46px;
+      padding: 7px 8px;
+      background: #d9e2ec;
+      color: #243b53;
+      border: 1px solid #bcccdc;
+      border-radius: 6px;
+      text-align: left;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      line-height: 1.15;
+      overflow: hidden;
+    }
+    .step.active { background: var(--blue); color: white; border-color: var(--blue); }
+    .panel {
+      display: none;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 560px;
+    }
+    .panel.active { display: block; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+    .right-actions, .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .include-controls { display: flex; gap: 18px; align-items: center; margin-bottom: 10px; }
+    .th-check { display: flex; gap: 6px; align-items: center; justify-content: center; margin: 0; font-weight: 700; }
+    .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .metric { border: 1px solid var(--line); border-radius: 6px; padding: 12px; background: #f8fafc; }
+    .metric b { display: block; font-size: 24px; margin-top: 4px; }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 6px; max-height: 450px; }
+    table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 6px; vertical-align: top; }
+    th { position: sticky; top: 0; background: #f0f4f8; text-align: left; z-index: 1; }
+    td input, td select, td textarea { font-size: 13px; padding: 5px 6px; }
+    td textarea { min-height: 42px; }
+    .check { display: flex; align-items: center; gap: 8px; font-weight: 400; margin: 0; }
+    .rule-list { max-height: 470px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+    .rule-card { border: 1px solid var(--line); border-radius: 6px; padding: 12px; margin-bottom: 10px; background: #fff; }
+    .rule-title-row {
+      display: grid;
+      grid-template-columns: 74px minmax(220px, 1fr) 40px;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f8fafc;
+      margin-bottom: 10px;
+    }
+    .rule-name-field { margin: 0; font-size: 13px; font-weight: 700; color: #243b53; }
+    .rule-name-field input {
+      margin-top: 4px;
+      font-size: 16px;
+      font-weight: 700;
+      background: #fff;
+    }
+    .rule-config { display: grid; grid-template-columns: 110px minmax(180px, 1fr) 150px; gap: 8px; align-items: end; }
+    .rule-field { margin: 0; font-size: 13px; font-weight: 700; color: #243b53; }
+    .rule-field input, .rule-field select { margin-top: 4px; }
+    .rule-field.check { align-items: center; padding-bottom: 8px; }
+    .rule-conditions { margin-top: 10px; }
+    .rule-conditions label { margin-top: 0; font-size: 13px; color: #243b53; }
+    .rule-conditions textarea { min-height: 70px; }
+    .pill { display: inline-block; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: #243b53; font-size: 13px; font-weight: 700; }
+    .error { background: #fff5f5; border: 1px solid #ffbdbd; color: #8a041a; padding: 10px; border-radius: 6px; white-space: pre-wrap; }
+    .success { background: #e3f9e5; border: 1px solid #57ae5b; color: #2f8132; padding: 10px; border-radius: 6px; }
+    .spinner { display: none; color: #52606d; margin-top: 10px; }
+    .spinner.active { display: block; }
+    .footer-nav {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 20;
+      width: min(1280px, calc(100vw - 40px));
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    .footer-nav button { pointer-events: auto; min-width: 108px; }
+    #prevStepBtn { margin-right: auto; }
+    .swatch {
+      min-height: 58px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      text-align: center;
+    }
+    iframe { width: 100%; height: 520px; border: 1px solid #bcccdc; border-radius: 6px; background: #f8fafc; }
+    @media (max-width: 900px) {
+      main { padding: 12px; }
+      .steps, .metrics, .grid, .grid-3 { grid-template-columns: 1fr; }
+      .top { align-items: flex-start; flex-direction: column; }
+      .rule-head { grid-template-columns: 26px 70px 1fr; }
+      .footer-nav { width: calc(100vw - 24px); bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <h1>ULNL Builder</h1>
+        <p class="hint">Xây dựng file Ước lượng nỗ lực từ danh sách chức năng, rule mã CN, tham số Phi CN và cấu hình định dạng.</p>
+      </div>
+      <a class="button secondary" href="/">Chọn module</a>
+    </div>
+
+    <div class="steps" id="steps"></div>
+
+    <section class="panel active" data-panel="1">
+      <h2>Bước 1: Import</h2>
+      <div class="grid">
+        <div>
+          <label>Excel danh sách chức năng (.xlsx/.xlsm)</label>
+          <input type="file" id="functionExcel" accept=".xlsx,.xlsm">
+          <p class="hint">Tool tự tìm header có các cột STT, Mã CN, Cấp, Tên chức năng, Mô tả.</p>
+        </div>
+        <div>
+          <label>Settings JSON từ phiên trước</label>
+          <input type="file" id="settingsImport" accept=".json">
+          <p class="hint">Có thể import riêng settings, hoặc import cùng Excel để thay danh sách chức năng.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="ghost" onclick="downloadSettings()">Lưu settings JSON</button>
+      </div>
+      <div class="spinner" id="importSpinner">Đang đọc dữ liệu...</div>
+      <div id="importResult"></div>
+
+      <h3>Trang bìa</h3>
+      <div class="grid-3" id="coverFields"></div>
+    </section>
+
+    <section class="panel" data-panel="2">
+      <h2>Bước 2: Danh sách chức năng</h2>
+      <div class="toolbar">
+        <input type="text" id="functionSearch" placeholder="Tìm tên hoặc mã chức năng" style="max-width:320px">
+        <button type="button" class="light" onclick="jumpFunction()">Tìm tiếp</button>
+        <button type="button" onclick="addFunction()">Thêm dòng</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:58px">STT</th>
+              <th style="width:120px">Mã CN</th>
+              <th style="width:72px">Cấp</th>
+              <th>Tên chức năng</th>
+              <th>Mô tả</th>
+              <th style="width:154px">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="functionRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="3">
+      <h2>Bước 3: Web / Mobile</h2>
+      <div class="include-controls">
+        <span>Bao gồm:</span>
+        <label class="check"><input type="checkbox" id="enableWeb" onchange="setProjectFlag('enable_web', this.checked)"> Web</label>
+        <label class="check"><input type="checkbox" id="enableMobile" onchange="setProjectFlag('enable_mobile', this.checked)"> Mobile</label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Mã CN</th>
+              <th>Tên chức năng</th>
+              <th style="width:110px">
+                <label class="th-check"><input type="checkbox" id="bulkWebCheck" onchange="bulkPlatform('web', this.checked)"> Web</label>
+              </th>
+              <th style="width:110px">
+                <label class="th-check"><input type="checkbox" id="bulkMobileCheck" onchange="bulkPlatform('mobile', this.checked)"> Mobile</label>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="platformRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="4">
+      <h2>Bước 4: Tự gán mã CN</h2>
+      <div class="grid">
+        <div>
+          <div class="toolbar">
+            <button type="button" onclick="applyClassifier()">Gán mã cho tất cả CN</button>
+            <button type="button" class="light" onclick="addRule()">Thêm rule gán mã</button>
+            <button type="button" class="ghost" onclick="downloadRules()">Lưu rule JSON</button>
+            <label class="button ghost" style="margin:0; color:#243b53">
+              Nạp rule JSON
+              <input type="file" id="ruleImport" accept=".json" style="display:none">
+            </label>
+          </div>
+          <div class="rule-list" id="ruleList"></div>
+        </div>
+        <div>
+          <h3>Thử gán mã</h3>
+          <label>Tên chức năng</label>
+          <input type="text" id="testRuleName" placeholder="Ví dụ: Đăng nhập hệ thống">
+          <label>Mô tả</label>
+          <textarea id="testRuleDesc"></textarea>
+          <label>Nền tảng</label>
+          <select id="testRulePlatform"><option value="web">Web</option><option value="mobile">Mobile</option></select>
+          <div class="actions">
+            <span></span>
+            <button type="button" onclick="testRule()">Thử rule</button>
+          </div>
+          <div id="testRuleResult"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="5">
+      <h2>Bước 5: Nỗ lực</h2>
+      <h3>Tham số Phi CN</h3>
+      <div class="grid-3" id="phiFields"></div>
+      <h3>Bảng nỗ lực chức năng</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Mã CN</th><th>Tên chức năng</th><th>Web</th><th>Mobile</th>
+              <th>%TSD GP</th><th>%TSD PT</th><th>%TSD KT</th>
+              <th>TN GP</th><th>TN PT</th><th>TN KT</th><th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody id="effortRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="6">
+      <h2>Bước 6: Định dạng</h2>
+      <div class="grid">
+        <div>
+          <label>Sheet</label>
+          <select id="formatSheet" onchange="renderFormatFields()"></select>
+          <label>Vùng</label>
+          <select id="formatRegion" onchange="renderFormatFields()"></select>
+          <div class="grid" id="formatFields"></div>
+        </div>
+        <div>
+          <h3>Live preview</h3>
+          <div class="swatch" id="formatSwatch">Dòng mẫu định dạng</div>
+          <div class="actions">
+            <button type="button" class="light" onclick="resetFormatting()">Reset định dạng mặc định</button>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="7">
+      <h2>Bước 7: Preview / Export</h2>
+      <div class="metrics" id="projectMetrics"></div>
+      <div class="actions">
+        <button type="button" onclick="buildExcel()">Build Excel</button>
+        <button type="button" class="ghost" onclick="downloadSettings()">Lưu settings JSON</button>
+      </div>
+      <div class="spinner" id="buildSpinner">Đang build ULNL...</div>
+      <div id="buildResult"></div>
+      <div id="downloadArea"></div>
+      <div id="pdfArea" style="margin-top:14px"></div>
+    </section>
+  </main>
+
+  <div class="footer-nav">
+    <button type="button" class="secondary" id="prevStepBtn" onclick="prevStep()">Quay lại</button>
+    <button type="button" id="nextStepBtn" onclick="nextStep()">Tiếp</button>
+  </div>
+
+  <script>
+    const DEFAULT_PROJECT = {{ default_project | tojson }};
+    const DEFAULT_RULES = {{ default_rules | tojson }};
+    const PROJECT_STORAGE_KEY = "ulnl_builder_project_v1";
+    const STEPS = ["Import", "Danh sách CN", "Web/Mobile", "Rules", "Nỗ lực", "Định dạng", "Preview"];
+    const COVER_FIELDS = [
+      ["project_name", "Tên dự án"], ["project_code", "Mã dự án"], ["doc_code", "Mã tài liệu"], ["version", "Phiên bản"],
+      ["nguoi_lap_ten", "Người lập"], ["nguoi_lap_chucvu", "Chức vụ người lập"], ["nguoi_lap_ngay", "Ngày lập"],
+      ["nguoi_ktra_ten", "Người kiểm tra"], ["nguoi_ktra_chucvu", "Chức vụ kiểm tra"], ["nguoi_ktra_ngay", "Ngày kiểm tra"],
+      ["nguoi_pduyet_ten", "Người phê duyệt"], ["nguoi_pduyet_chucvu", "Chức vụ phê duyệt"], ["nguoi_pduyet_ngay", "Ngày phê duyệt"],
+    ];
+    const PHI_FIELDS = [
+      ["n_module", "Số module"], ["n_upcode", "Số lần upcode"], ["n_bugs", "Số lỗi sau triển khai"],
+      ["n_year", "Số năm bảo hành"], ["n_hrs_bh_month", "Giờ hỗ trợ/tháng"], ["n_sys", "Số hệ thống tích hợp"], ["pct_qtda", "% QTDA"],
+    ];
+    const FORMAT_SHEETS = [
+      ["trang_bia", "Trang bìa"], ["tong_hop", "Tổng hợp"], ["nl_chuc_nang", "NL Chức năng"], ["nl_phi_cn", "NL Phi CN"],
+    ];
+    const FORMAT_REGIONS = [["title", "Title"], ["header", "Header"], ["data", "Data"], ["total", "Total"]];
+
+    let project = loadSavedProject() || structuredClone(DEFAULT_PROJECT);
+    let currentStep = 1;
+    let functionSearchIndex = -1;
+    let excelUrl = null;
+    let pdfUrl = null;
+    let importedProjectRaw = null;
+    let functionRaw = new WeakMap();
+    let ruleRaw = new WeakMap();
+    let dirtyFunctions = new WeakSet();
+    let dirtyRules = new WeakSet();
+    let dirtyProjectParts = new Set();
+    let importedRulesRaw = null;
+    let dirtyRulesStructure = false;
+    let importedInputSignature = "";
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function cloneJson(value) {
+      return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+    }
+
+    function loadSavedProject() {
+      try {
+        const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
+        if (!raw) return null;
+        const saved = JSON.parse(raw);
+        return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : null;
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function saveProjectState() {
+      try {
+        localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projectForOutput()));
+      } catch (_err) {}
+    }
+
+    function currentImportSignature() {
+      const excel = document.getElementById("functionExcel").files[0];
+      const settings = document.getElementById("settingsImport").files[0];
+      return [excel, settings].map(file => file ? `${file.name}:${file.size}:${file.lastModified}` : "").join("|");
+    }
+
+    async function ensureImportedBeforeLeavingImport() {
+      const signature = currentImportSignature();
+      if (!signature.replace("|", "")) return true;
+      if (signature === importedInputSignature) return true;
+      return await importProject();
+    }
+
+    function bindImportedProjectRaw(raw, functionsReplaced = false) {
+      importedProjectRaw = raw && typeof raw === "object" && !Array.isArray(raw) ? cloneJson(raw) : null;
+      functionRaw = new WeakMap();
+      ruleRaw = new WeakMap();
+      dirtyFunctions = new WeakSet();
+      dirtyRules = new WeakSet();
+      dirtyProjectParts = new Set();
+      if (!importedProjectRaw) return;
+      if (functionsReplaced) {
+        dirtyProjectParts.add("functions");
+      } else if (Array.isArray(importedProjectRaw.functions)) {
+        (project.functions || []).forEach((func, i) => {
+          if (importedProjectRaw.functions[i]) functionRaw.set(func, importedProjectRaw.functions[i]);
+        });
+      }
+      if (Array.isArray(importedProjectRaw.classifier_rules)) {
+        (project.classifier_rules || []).forEach((rule, i) => {
+          if (importedProjectRaw.classifier_rules[i]) ruleRaw.set(rule, importedProjectRaw.classifier_rules[i]);
+        });
+      }
+    }
+
+    function functionsForOutput() {
+      return (project.functions || []).map(func => {
+        const raw = functionRaw.get(func);
+        return raw && !dirtyFunctions.has(func) ? cloneJson(raw) : cloneJson(func);
+      });
+    }
+
+    function classifierRulesForOutput() {
+      return (project.classifier_rules || []).map(rule => {
+        const raw = ruleRaw.get(rule);
+        return raw && !dirtyRules.has(rule) ? cloneJson(raw) : cloneJson(rule);
+      });
+    }
+
+    function projectForOutput() {
+      if (!importedProjectRaw) return cloneJson(project);
+      const output = cloneJson(importedProjectRaw);
+      for (const part of ["cover", "phi_cn", "formatting", "enable_web", "enable_mobile"]) {
+        if (dirtyProjectParts.has(part)) output[part] = cloneJson(project[part]);
+      }
+      if (dirtyProjectParts.has("functions") || (project.functions || []).some(func => dirtyFunctions.has(func))) {
+        output.functions = functionsForOutput();
+      }
+      if (dirtyProjectParts.has("classifier_rules") || (project.classifier_rules || []).some(rule => dirtyRules.has(rule))) {
+        output.classifier_rules = classifierRulesForOutput();
+      }
+      return output;
+    }
+
+    function projectFormData() {
+      const form = new FormData();
+      form.append("project_json", JSON.stringify(projectForOutput()));
+      return form;
+    }
+
+    function leafFunctions() {
+      return (project.functions || []).filter(f => Number(f.cap || 3) === 3);
+    }
+
+    function renderSteps() {
+      document.getElementById("steps").innerHTML = STEPS.map((name, idx) => {
+        const step = idx + 1;
+        return `<button type="button" class="step ${step === currentStep ? "active" : ""}" onclick="goStep(${step})">${step}. ${escapeHtml(name)}</button>`;
+      }).join("");
+      document.querySelectorAll(".panel").forEach(panel => {
+        panel.classList.toggle("active", Number(panel.dataset.panel) === currentStep);
+      });
+      document.getElementById("prevStepBtn").style.visibility = currentStep === 1 ? "hidden" : "visible";
+      document.getElementById("nextStepBtn").style.display = currentStep === 7 ? "none" : "inline-block";
+      document.getElementById("nextStepBtn").textContent = currentStep === 6 ? "Preview" : "Tiếp";
+    }
+
+    async function goStep(step) {
+      if (currentStep === 1 && step > 1) {
+        const ok = await ensureImportedBeforeLeavingImport();
+        if (!ok) return;
+      }
+      currentStep = Math.max(1, Math.min(7, step));
+      if (currentStep === 7) renderMetrics();
+      renderSteps();
+    }
+
+    function prevStep() { goStep(currentStep - 1); }
+    async function nextStep() { await goStep(currentStep + 1); }
+
+    function renderCover() {
+      document.getElementById("coverFields").innerHTML = COVER_FIELDS.map(([field, label]) => `
+        <label>${escapeHtml(label)}
+          <input type="text" value="${escapeHtml(project.cover?.[field] || "")}" data-cover="${escapeHtml(field)}">
+        </label>
+      `).join("");
+    }
+
+    function renderPhi() {
+      document.getElementById("phiFields").innerHTML = PHI_FIELDS.map(([field, label]) => `
+        <label>${escapeHtml(label)}
+          <input type="number" step="${field === "pct_qtda" ? "0.01" : "1"}" value="${escapeHtml(project.phi_cn?.[field] ?? "")}" data-phi="${escapeHtml(field)}">
+        </label>
+      `).join("");
+    }
+
+    function updateStatsBox(targetId, stats) {
+      document.getElementById(targetId).innerHTML = [
+        ["Tổng dòng", stats.functions || 0],
+        ["CN cấp 3", stats.leaf_functions || 0],
+        ["Web", stats.web_enabled || 0],
+        ["Mobile", stats.mobile_enabled || 0],
+        ["Rules", stats.rules || 0],
+      ].map(([label, value]) => `<div class="metric">${escapeHtml(label)}<b>${escapeHtml(value)}</b></div>`).join("");
+    }
+
+    function statsFromProject() {
+      const leafs = leafFunctions();
+      return {
+        functions: (project.functions || []).length,
+        leaf_functions: leafs.length,
+        web_enabled: leafs.filter(f => f.include_web).length,
+        mobile_enabled: leafs.filter(f => f.include_mobile).length,
+        rules: (project.classifier_rules || []).length,
+      };
+    }
+
+    function renderFunctions() {
+      const rows = project.functions || [];
+      document.getElementById("functionRows").innerHTML = rows.map((f, i) => `
+        <tr id="funcRow${i}">
+          <td><input type="number" value="${escapeHtml(f.stt || i + 1)}" data-func="${i}" data-field="stt"></td>
+          <td><input type="text" value="${escapeHtml(f.ma || "")}" data-func="${i}" data-field="ma"></td>
+          <td><input type="number" min="1" max="3" value="${escapeHtml(f.cap || 3)}" data-func="${i}" data-field="cap"></td>
+          <td><input type="text" value="${escapeHtml(f.name || "")}" data-func="${i}" data-field="name"></td>
+          <td><textarea data-func="${i}" data-field="desc">${escapeHtml(f.desc || "")}</textarea></td>
+          <td>
+            <div class="icon-actions">
+              <button type="button" class="light icon-btn" title="Lên" aria-label="Lên" onclick="moveFunction(${i}, -1)">&uarr;</button>
+              <button type="button" class="light icon-btn" title="Xuống" aria-label="Xuống" onclick="moveFunction(${i}, 1)">&darr;</button>
+              <button type="button" class="danger icon-btn" title="Xóa" aria-label="Xóa" onclick="deleteFunction(${i})">&times;</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function renderPlatforms() {
+      document.getElementById("enableWeb").checked = !!project.enable_web;
+      document.getElementById("enableMobile").checked = !!project.enable_mobile;
+      const leafs = leafFunctions();
+      document.getElementById("bulkWebCheck").checked = leafs.length > 0 && leafs.every(f => f.include_web);
+      document.getElementById("bulkMobileCheck").checked = leafs.length > 0 && leafs.every(f => f.include_mobile);
+      document.getElementById("platformRows").innerHTML = leafFunctions().map((f) => {
+        const index = project.functions.indexOf(f);
+        return `<tr>
+          <td>${escapeHtml(f.ma || "")}</td>
+          <td>${escapeHtml(f.name || "")}</td>
+          <td><input type="checkbox" ${f.include_web ? "checked" : ""} data-func="${index}" data-field="include_web"></td>
+          <td><input type="checkbox" ${f.include_mobile ? "checked" : ""} data-func="${index}" data-field="include_mobile"></td>
+        </tr>`;
+      }).join("");
+    }
+
+    function keywordsText(rule, field) {
+      return Array.isArray(rule[field]) ? rule[field].join("\n") : "";
+    }
+
+    function renderRules() {
+      const rules = project.classifier_rules || [];
+      document.getElementById("ruleList").innerHTML = rules.map((rule, i) => `
+        <div class="rule-card">
+          <div class="rule-title-row">
+            <label class="rule-field check" title="Tắt rule để giữ lại nhưng không dùng khi gán mã">
+              <input type="checkbox" ${rule.enabled !== false ? "checked" : ""} data-rule="${i}" data-field="enabled">
+              Bật
+            </label>
+            <label class="rule-name-field">
+              Tên rule
+              <input type="text" value="${escapeHtml(rule.name || "")}" data-rule="${i}" data-field="name" placeholder="Ví dụ: Dashboard điều hành">
+            </label>
+            <button type="button" class="danger icon-btn" title="Xóa rule" aria-label="Xóa rule" onclick="deleteRule(${i})">&times;</button>
+          </div>
+          <div class="rule-config">
+            <label class="rule-field" title="Số nhỏ chạy trước; rule khớp trước sẽ được ưu tiên">
+              Ưu tiên
+              <input type="number" value="${escapeHtml(rule.priority ?? 100)}" data-rule="${i}" data-field="priority">
+            </label>
+            <label class="rule-field">
+              Mã CN sẽ gán
+              <input type="text" value="${escapeHtml(rule.result || "")}" data-rule="${i}" data-field="result" placeholder="Ví dụ: CN_WEB2">
+            </label>
+            <label class="rule-field">
+              Áp dụng cho
+              <select data-rule="${i}" data-field="platform">
+                ${[
+                  ["both", "Web + Mobile"],
+                  ["web", "Chỉ Web"],
+                  ["mobile", "Chỉ Mobile"],
+                ].map(([value, label]) => `<option value="${value}" ${value === (rule.platform || "both") ? "selected" : ""}>${label}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="grid-3 rule-conditions">
+            <label title="Khớp nếu tên hoặc mô tả chứa ít nhất một dòng trong ô này">
+              Chứa ít nhất một
+              <textarea data-rule="${i}" data-field="keywords_any" placeholder="Mỗi dòng một từ/cụm từ">${escapeHtml(keywordsText(rule, "keywords_any"))}</textarea>
+            </label>
+            <label title="Khớp nếu tên hoặc mô tả chứa tất cả các dòng trong ô này">
+              Bắt buộc có đủ
+              <textarea data-rule="${i}" data-field="keywords_all" placeholder="Mỗi dòng một điều kiện bắt buộc">${escapeHtml(keywordsText(rule, "keywords_all"))}</textarea>
+            </label>
+            <label title="Không khớp nếu tên hoặc mô tả chứa bất kỳ dòng nào trong ô này">
+              Không được chứa
+              <textarea data-rule="${i}" data-field="keywords_none" placeholder="Mỗi dòng một từ/cụm từ loại trừ">${escapeHtml(keywordsText(rule, "keywords_none"))}</textarea>
+            </label>
+          </div>
+          <div class="grid-3 rule-conditions">
+            <label title="Chỉ xét tên chức năng">
+              Tên bắt đầu bằng
+              <textarea data-rule="${i}" data-field="name_starts_with" placeholder="Ví dụ: Quản lý">${escapeHtml(keywordsText(rule, "name_starts_with"))}</textarea>
+            </label>
+            <label title="Chỉ xét tên chức năng">
+              Tên khớp chính xác
+              <textarea data-rule="${i}" data-field="name_equals" placeholder="Ví dụ: Đăng nhập">${escapeHtml(keywordsText(rule, "name_equals"))}</textarea>
+            </label>
+            <label title="Biểu thức chính quy áp dụng cho tên chức năng">
+              Regex nâng cao
+              <input type="text" value="${escapeHtml(rule.name_regex || "")}" data-rule="${i}" data-field="name_regex" placeholder="Ví dụ: ^Dashboard.*">
+            </label>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderEffort() {
+      document.getElementById("effortRows").innerHTML = leafFunctions().map((f) => {
+        const i = project.functions.indexOf(f);
+        return `<tr>
+          <td>${escapeHtml(f.ma || "")}</td>
+          <td>${escapeHtml(f.name || "")}</td>
+          <td><input type="text" value="${escapeHtml(f.ma_cn_web || "")}" data-func="${i}" data-field="ma_cn_web"></td>
+          <td><input type="text" value="${escapeHtml(f.ma_cn_mobile || "")}" data-func="${i}" data-field="ma_cn_mobile"></td>
+          <td><input type="number" min="0" max="1" step="0.01" value="${escapeHtml(f.o ?? 0)}" data-func="${i}" data-field="o"></td>
+          <td><input type="number" min="0" max="1" step="0.01" value="${escapeHtml(f.p ?? 0)}" data-func="${i}" data-field="p"></td>
+          <td><input type="number" min="0" max="1" step="0.01" value="${escapeHtml(f.q ?? 0)}" data-func="${i}" data-field="q"></td>
+          <td><select data-func="${i}" data-field="tn_gp">${yesOptions(f.tn_gp)}</select></td>
+          <td><select data-func="${i}" data-field="tn_pt">${yesOptions(f.tn_pt)}</select></td>
+          <td><select data-func="${i}" data-field="tn_kt">${yesOptions(f.tn_kt)}</select></td>
+          <td><input type="text" value="${escapeHtml(f.ghi_chu || "")}" data-func="${i}" data-field="ghi_chu"></td>
+        </tr>`;
+      }).join("");
+    }
+
+    function yesOptions(value) {
+      return ["Có", "Không"].map(v => `<option value="${v}" ${v === value ? "selected" : ""}>${v}</option>`).join("");
+    }
+
+    function renderFormatSelectors() {
+      document.getElementById("formatSheet").innerHTML = FORMAT_SHEETS.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("");
+      document.getElementById("formatRegion").innerHTML = FORMAT_REGIONS.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("");
+    }
+
+    function selectedStyle() {
+      const sheet = document.getElementById("formatSheet").value;
+      const region = document.getElementById("formatRegion").value;
+      project.formatting[sheet] = project.formatting[sheet] || {};
+      project.formatting[sheet][region] = project.formatting[sheet][region] || structuredClone(DEFAULT_PROJECT.formatting[sheet][region]);
+      return project.formatting[sheet][region];
+    }
+
+    function renderFormatFields() {
+      const style = selectedStyle();
+      document.getElementById("formatFields").innerHTML = `
+        <label>Font<input type="text" value="${escapeHtml(style.font_name || "")}" data-style="font_name"></label>
+        <label>Size<input type="number" value="${escapeHtml(style.font_size || 11)}" data-style="font_size"></label>
+        <label>Màu chữ<input type="color" value="#${escapeHtml(style.font_color || "000000")}" data-style="font_color"></label>
+        <label>Màu nền<input type="color" value="#${escapeHtml(style.bg_color || "FFFFFF")}" data-style="bg_color"></label>
+        <label>Căn ngang<select data-style="horizontal">${["left", "center", "right"].map(v => `<option value="${v}" ${v === style.horizontal ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+        <label>Căn dọc<select data-style="vertical">${["top", "center", "bottom"].map(v => `<option value="${v}" ${v === style.vertical ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+        <label class="check"><input type="checkbox" ${style.bold ? "checked" : ""} data-style="bold"> Bold</label>
+        <label class="check"><input type="checkbox" ${style.italic ? "checked" : ""} data-style="italic"> Italic</label>
+        <label class="check"><input type="checkbox" ${style.wrap_text ? "checked" : ""} data-style="wrap_text"> Wrap</label>
+        <label class="check"><input type="checkbox" ${style.border ? "checked" : ""} data-style="border"> Border</label>
+      `;
+      renderSwatch();
+    }
+
+    function renderSwatch() {
+      const style = selectedStyle();
+      const swatch = document.getElementById("formatSwatch");
+      swatch.style.fontFamily = style.font_name || "Times New Roman";
+      swatch.style.fontSize = `${style.font_size || 11}pt`;
+      swatch.style.fontWeight = style.bold ? "700" : "400";
+      swatch.style.fontStyle = style.italic ? "italic" : "normal";
+      swatch.style.color = `#${style.font_color || "000000"}`;
+      swatch.style.background = `#${style.bg_color || "FFFFFF"}`;
+      swatch.style.justifyContent = style.horizontal === "right" ? "flex-end" : style.horizontal === "center" ? "center" : "flex-start";
+      swatch.style.borderStyle = style.border ? "solid" : "dashed";
+    }
+
+    function renderMetrics() {
+      updateStatsBox("projectMetrics", statsFromProject());
+    }
+
+    function renderAll() {
+      renderCover();
+      renderPhi();
+      renderFunctions();
+      renderPlatforms();
+      renderRules();
+      renderEffort();
+      renderFormatSelectors();
+      renderFormatFields();
+      renderMetrics();
+      renderSteps();
+    }
+
+    async function importProject() {
+      document.getElementById("importSpinner").classList.add("active");
+      document.getElementById("importResult").innerHTML = "";
+      const form = new FormData();
+      const excel = document.getElementById("functionExcel").files[0];
+      const settings = document.getElementById("settingsImport").files[0];
+      if (excel) form.append("excel_file", excel);
+      if (settings) form.append("settings_file", settings);
+      try {
+        const rawSettings = settings ? JSON.parse((await settings.text()).replace(/^\uFEFF/, "")) : null;
+        const res = await fetch("/ulnl/import", {method: "POST", body: form});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Import lỗi");
+        project = data.project;
+        bindImportedProjectRaw(rawSettings, Boolean(excel));
+        importedInputSignature = currentImportSignature();
+        saveProjectState();
+        renderAll();
+        document.getElementById("importResult").innerHTML = `<p class="success">Đã import ${data.stats.functions || 0} dòng chức năng.</p>`;
+        return true;
+      } catch (err) {
+        document.getElementById("importResult").innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+        return false;
+      } finally {
+        document.getElementById("importSpinner").classList.remove("active");
+      }
+    }
+
+    function downloadJson(data, filename) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function downloadSettings() { downloadJson(projectForOutput(), "ulnl_settings.json"); }
+    function downloadRules() {
+      if (importedRulesRaw && !dirtyRulesStructure && !(project.classifier_rules || []).some(rule => dirtyRules.has(rule))) {
+        downloadJson(cloneJson(importedRulesRaw), "ulnl_rules.json");
+        return;
+      }
+      const output = Array.isArray(importedRulesRaw) ? classifierRulesForOutput() : {rules: classifierRulesForOutput()};
+      downloadJson(output, "ulnl_rules.json");
+    }
+
+    function addFunction() {
+      project.functions = project.functions || [];
+      dirtyProjectParts.add("functions");
+      project.functions.push({stt: project.functions.length + 1, ma: "", cap: 3, name: "", desc: "", ma_cn_web: "", ma_cn_mobile: "", include_web: true, include_mobile: false, o: 0, p: 0, q: 0, tn_gp: "Có", tn_pt: "Có", tn_kt: "Có", tsd_tu: "", ghi_chu: ""});
+      saveProjectState();
+      renderFunctions();
+    }
+
+    function deleteFunction(index) {
+      dirtyProjectParts.add("functions");
+      project.functions.splice(index, 1);
+      saveProjectState();
+      renderFunctions();
+      renderPlatforms();
+      renderEffort();
+    }
+
+    function moveFunction(index, delta) {
+      const target = index + delta;
+      if (target < 0 || target >= project.functions.length) return;
+      dirtyProjectParts.add("functions");
+      [project.functions[index], project.functions[target]] = [project.functions[target], project.functions[index]];
+      saveProjectState();
+      renderFunctions();
+    }
+
+    function jumpFunction() {
+      const query = document.getElementById("functionSearch").value.trim().toLowerCase();
+      if (!query) return;
+      const rows = project.functions || [];
+      for (let offset = 1; offset <= rows.length; offset++) {
+        const i = (functionSearchIndex + offset) % rows.length;
+        const f = rows[i];
+        if (`${f.ma || ""} ${f.name || ""} ${f.desc || ""}`.toLowerCase().includes(query)) {
+          functionSearchIndex = i;
+          document.getElementById(`funcRow${i}`)?.scrollIntoView({block: "center"});
+          return;
+        }
+      }
+    }
+
+    function setProjectFlag(field, value) {
+      dirtyProjectParts.add(field);
+      project[field] = value;
+      saveProjectState();
+    }
+
+    function bulkPlatform(platform, value) {
+      leafFunctions().forEach(f => {
+        dirtyFunctions.add(f);
+        if (platform === "web") f.include_web = value;
+        if (platform === "mobile") f.include_mobile = value;
+      });
+      if (platform === "web") project.enable_web = value;
+      if (platform === "mobile") project.enable_mobile = value;
+      dirtyProjectParts.add(platform === "web" ? "enable_web" : "enable_mobile");
+      saveProjectState();
+      renderPlatforms();
+    }
+
+    function addRule() {
+      project.classifier_rules = project.classifier_rules || [];
+      dirtyProjectParts.add("classifier_rules");
+      dirtyRulesStructure = true;
+      project.classifier_rules.push({id: `custom-${Date.now()}`, name: "Rule mới", result: "CN_WEB2", priority: 500, enabled: true, keywords_any: [], keywords_all: [], keywords_none: [], name_starts_with: [], name_equals: [], name_regex: "", platform: "both", group_code: "", comment: ""});
+      saveProjectState();
+      renderRules();
+    }
+
+    function deleteRule(index) {
+      dirtyProjectParts.add("classifier_rules");
+      dirtyRulesStructure = true;
+      project.classifier_rules.splice(index, 1);
+      saveProjectState();
+      renderRules();
+    }
+
+    async function applyClassifier() {
+      const form = projectFormData();
+      form.append("force", "true");
+      const res = await fetch("/ulnl/classify", {method: "POST", body: form});
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.detail || "Classifier lỗi");
+        return;
+      }
+      const preservedRules = classifierRulesForOutput();
+      project = data.project;
+      ruleRaw = new WeakMap();
+      (project.classifier_rules || []).forEach((rule, i) => {
+        if (preservedRules[i]) ruleRaw.set(rule, preservedRules[i]);
+      });
+      dirtyRules = new WeakSet();
+      dirtyProjectParts.add("functions");
+      saveProjectState();
+      renderEffort();
+      renderPlatforms();
+      document.getElementById("testRuleResult").innerHTML = `<p class="success">Đã gán ${data.classified || 0} mã CN.</p>`;
+    }
+
+    async function testRule() {
+      const form = projectFormData();
+      form.append("name", document.getElementById("testRuleName").value);
+      form.append("desc", document.getElementById("testRuleDesc").value);
+      form.append("platform", document.getElementById("testRulePlatform").value);
+      const res = await fetch("/ulnl/test-rule", {method: "POST", body: form});
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById("testRuleResult").innerHTML = `<p class="error">${escapeHtml(data.detail || "Test lỗi")}</p>`;
+        return;
+      }
+      document.getElementById("testRuleResult").innerHTML = `<p class="success"><b>${escapeHtml(data.ma_cn)}</b> qua rule <span class="pill">${escapeHtml(data.rule_id)}</span></p>`;
+    }
+
+    function resetFormatting() {
+      project.formatting = structuredClone(DEFAULT_PROJECT.formatting);
+      dirtyProjectParts.add("formatting");
+      saveProjectState();
+      renderFormatFields();
+    }
+
+    async function buildExcel() {
+      document.getElementById("buildSpinner").classList.add("active");
+      document.getElementById("buildResult").innerHTML = "";
+      document.getElementById("downloadArea").innerHTML = "";
+      try {
+        const res = await fetch("/ulnl/generate", {method: "POST", body: projectFormData()});
+        if (!res.ok) {
+          let data = {};
+          try { data = await res.json(); } catch (_err) {}
+          throw new Error(data.detail || "Build lỗi");
+        }
+        const blob = await res.blob();
+        if (excelUrl) URL.revokeObjectURL(excelUrl);
+        excelUrl = URL.createObjectURL(blob);
+        document.getElementById("buildResult").innerHTML = `<p class="success">Đã build xong file ULNL. Đang tạo preview PDF...</p>`;
+        document.getElementById("downloadArea").innerHTML = `<p><a class="button" href="${excelUrl}" download="ULNL_output.xlsx">Tải file Excel</a></p>`;
+        await previewPdf();
+      } catch (err) {
+        document.getElementById("buildResult").innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+      } finally {
+        document.getElementById("buildSpinner").classList.remove("active");
+      }
+    }
+
+    async function previewPdf() {
+      document.getElementById("buildSpinner").classList.add("active");
+      document.getElementById("pdfArea").innerHTML = "";
+      try {
+        const res = await fetch("/ulnl/preview-pdf", {method: "POST", body: projectFormData()});
+        if (!res.ok) {
+          let data = {};
+          try { data = await res.json(); } catch (_err) {}
+          throw new Error(data.detail || "Preview PDF lỗi");
+        }
+        const blob = await res.blob();
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        pdfUrl = URL.createObjectURL(blob);
+        document.getElementById("pdfArea").innerHTML = `<iframe src="${pdfUrl}" title="Preview ULNL PDF"></iframe>`;
+        document.getElementById("buildResult").innerHTML = `<p class="success">Đã build xong file ULNL. Preview PDF đã sẵn sàng.</p>`;
+      } catch (err) {
+        document.getElementById("pdfArea").innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+      } finally {
+        document.getElementById("buildSpinner").classList.remove("active");
+      }
+    }
+
+    document.addEventListener("input", (event) => {
+      const el = event.target;
+      if (el.dataset.cover) {
+        dirtyProjectParts.add("cover");
+        project.cover[el.dataset.cover] = el.value;
+      }
+      if (el.dataset.phi) {
+        dirtyProjectParts.add("phi_cn");
+        project.phi_cn[el.dataset.phi] = Number(el.value);
+      }
+      if (el.dataset.func !== undefined) {
+        const func = project.functions[Number(el.dataset.func)];
+        dirtyFunctions.add(func);
+        const field = el.dataset.field;
+        if (["stt", "cap"].includes(field)) func[field] = Number(el.value);
+        else if (["o", "p", "q"].includes(field)) func[field] = Number(el.value);
+        else if (["include_web", "include_mobile"].includes(field)) func[field] = el.checked;
+        else func[field] = el.value;
+      }
+      if (el.dataset.rule !== undefined) {
+        const rule = project.classifier_rules[Number(el.dataset.rule)];
+        dirtyRules.add(rule);
+        dirtyProjectParts.add("classifier_rules");
+        const field = el.dataset.field;
+        if (field === "enabled") rule[field] = el.checked;
+        else if (field === "priority") rule[field] = Number(el.value);
+        else if (["keywords_any", "keywords_all", "keywords_none", "name_starts_with", "name_equals"].includes(field)) {
+          rule[field] = el.value.split("\n").map(x => x.trim()).filter(Boolean);
+        } else {
+          rule[field] = el.value;
+        }
+      }
+      if (el.dataset.style) {
+        dirtyProjectParts.add("formatting");
+        const style = selectedStyle();
+        const field = el.dataset.style;
+        if (field === "font_size") style[field] = Number(el.value);
+        else if (["bold", "italic", "wrap_text", "border"].includes(field)) style[field] = el.checked;
+        else if (["font_color", "bg_color"].includes(field)) style[field] = el.value.replace("#", "").toUpperCase();
+        else style[field] = el.value;
+        renderSwatch();
+      }
+      if (el.dataset.cover || el.dataset.phi || el.dataset.func !== undefined || el.dataset.rule !== undefined || el.dataset.style) {
+        saveProjectState();
+      }
+    });
+
+    document.addEventListener("change", (event) => {
+      const el = event.target;
+      if (el.dataset.func !== undefined) {
+        const func = project.functions[Number(el.dataset.func)];
+        dirtyFunctions.add(func);
+        const field = el.dataset.field;
+        if (["include_web", "include_mobile"].includes(field)) func[field] = el.checked;
+        else func[field] = el.value;
+      }
+      if (el.dataset.rule !== undefined) {
+        const rule = project.classifier_rules[Number(el.dataset.rule)];
+        dirtyRules.add(rule);
+        dirtyProjectParts.add("classifier_rules");
+        const field = el.dataset.field;
+        if (field === "enabled") rule[field] = el.checked;
+        else rule[field] = el.value;
+      }
+      if (el.dataset.func !== undefined || el.dataset.rule !== undefined) {
+        saveProjectState();
+      }
+      if (el.dataset.func !== undefined && ["include_web", "include_mobile"].includes(el.dataset.field)) {
+        renderPlatforms();
+      }
+    });
+
+    document.getElementById("ruleImport").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        importedRulesRaw = cloneJson(data);
+        project.classifier_rules = Array.isArray(data) ? data : data.rules;
+        if (!Array.isArray(project.classifier_rules)) throw new Error("JSON phải là list rule hoặc object có key rules");
+        ruleRaw = new WeakMap();
+        dirtyRules = new WeakSet();
+        project.classifier_rules.forEach(rule => ruleRaw.set(rule, cloneJson(rule)));
+        dirtyRulesStructure = false;
+        dirtyProjectParts.add("classifier_rules");
+        saveProjectState();
+        renderRules();
+      } catch (err) {
+        alert("Rules JSON không hợp lệ: " + err.message);
+      }
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
+

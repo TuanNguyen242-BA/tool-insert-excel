@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tạo Excel CSDL</title>
+  <style>
+    :root { font-family: "Times New Roman", Times, serif; color: #1f2933; background: #f5f7fa; }
+    body { margin: 0; }
+    main { max-width: 980px; margin: 0 auto; padding: 28px; }
+    section { background: white; border: 1px solid #d9e2ec; border-radius: 8px; padding: 22px; }
+    h1 { font-size: 24px; margin: 0 0 14px; }
+    .muted { color: #52606d; }
+    .bar { height: 14px; background: #d9e2ec; border-radius: 999px; overflow: hidden; margin: 16px 0; }
+    .fill { height: 100%; width: 0; background: #0f609b; transition: width .2s ease; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    a { display: inline-block; padding: 9px 14px; border-radius: 6px; background: #0f609b; color: white; text-decoration: none; font-weight: 700; }
+    a.secondary { background: #52606d; }
+    pre { white-space: pre-wrap; background: #f8fafc; border: 1px solid #d9e2ec; padding: 10px; border-radius: 6px; max-height: 360px; overflow: auto; }
+    @media (max-width: 760px) { main { padding: 12px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>Tạo Excel CSDL</h1>
+      <p class="muted">Job ID: <b id="jobId">{{ job_id }}</b></p>
+      <div class="bar"><div class="fill" id="progressFill"></div></div>
+      <p id="statusText">Đang lấy trạng thái...</p>
+      <p id="messageText" class="muted"></p>
+
+      <div class="actions">
+        <a id="downloadLink" href="/csdl/jobs/{{ job_id }}/download" style="display:none">Tải file Excel</a>
+        <a class="secondary" href="/csdl">Tạo file khác</a>
+        <a class="secondary" href="/">Tool DOCX Template</a>
+      </div>
+      <pre id="logBox" style="display:none"></pre>
+      <pre id="errorBox" style="display:none"></pre>
+    </section>
+  </main>
+  <script>
+    const jobId = "{{ job_id }}";
+
+    async function refreshStatus() {
+      const res = await fetch(`/jobs/${jobId}/status`, {cache: "no-store"});
+      if (!res.ok) {
+        document.getElementById("statusText").textContent = "Không đọc được trạng thái job.";
+        return;
+      }
+      const data = await res.json();
+      const status = data.status || "unknown";
+      const progress = Number(data.progress || 0);
+      document.getElementById("progressFill").style.width = `${Math.max(0, Math.min(100, progress))}%`;
+      document.getElementById("statusText").textContent = `Trạng thái: ${status} (${progress}%)`;
+      document.getElementById("messageText").textContent = data.message || "";
+
+      if (data.log) {
+        const logBox = document.getElementById("logBox");
+        logBox.style.display = "block";
+        logBox.textContent = data.log;
+      }
+
+      if (status === "done") {
+        document.getElementById("downloadLink").style.display = "inline-block";
+        return;
+      }
+      if (status === "failed") {
+        const box = document.getElementById("errorBox");
+        box.style.display = "block";
+        box.textContent = data.error || "Job lỗi nhưng không có error message.";
+        return;
+      }
+      setTimeout(refreshStatus, 1800);
+    }
+
+    refreshStatus();
+  </script>
+</body>
+</html>

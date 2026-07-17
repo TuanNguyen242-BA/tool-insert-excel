@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tool Template Builder</title>
+  <style>
+    :root { font-family: "Times New Roman", Times, serif; color: #1f2933; background: #f5f7fa; }
+    body { margin: 0; }
+    main { max-width: 980px; margin: 0 auto; padding: 28px; }
+    h1 { font-size: 24px; margin: 0 0 18px; }
+    .top-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .button-link { display: inline-block; padding: 9px 14px; border-radius: 6px; background: #52606d; color: white; text-decoration: none; font-weight: 700; }
+    section { background: white; border: 1px solid #d9e2ec; border-radius: 8px; padding: 22px; }
+    label { display: block; font-weight: 600; margin: 16px 0 6px; }
+    input[type=file] { width: 100%; padding: 10px; border: 1px solid #bcccdc; border-radius: 6px; background: #fff; }
+    button { margin-top: 22px; padding: 10px 16px; border: 0; border-radius: 6px; background: #0f609b; color: white; font-weight: 700; cursor: pointer; }
+    button.remove-file { margin: 0; padding: 4px 8px; background: #b42318; font-size: 13px; }
+    .hint { color: #52606d; font-size: 14px; line-height: 1.5; }
+    .file-list { margin: 8px 0 0; padding: 0; list-style: none; border: 1px solid #d9e2ec; border-radius: 6px; overflow: hidden; }
+    .file-list:empty { display: none; }
+    .file-list li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #edf2f7; }
+    .file-list li:last-child { border-bottom: 0; }
+    .file-name { overflow-wrap: anywhere; }
+    .file-meta { color: #52606d; font-size: 13px; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top-actions">
+      <h1>Tool xây dựng tài liệu</h1>
+      <a class="button-link" href="/">Chọn module</a>
+    </div>
+    <section>
+      <form action="/configure" method="post" enctype="multipart/form-data">
+        <label>File Word template (.docx)</label>
+        <input type="file" id="docxInput" name="docx_file" accept=".docx" required>
+        <ul id="docxList" class="file-list"></ul>
+
+        <label>File Excel dữ liệu (.xlsx/.xlsm)</label>
+        <input type="file" id="excelInput" name="excel_file" accept=".xlsx,.xlsm" multiple required>
+        <ul id="excelList" class="file-list"></ul>
+
+        <p class="hint">
+          Bản web dùng luồng 7 bước: xác định phần mở đầu, kiểm tra defaults/sections,
+          chỉnh heading, chọn nội dung giữ/xoá/chèn theo từng heading, rồi tải DOCX đã generate.
+        </p>
+        <button type="submit">Phân tích file</button>
+      </form>
+    </section>
+  </main>
+  <script>
+    const docxInput = document.getElementById("docxInput");
+    const excelInput = document.getElementById("excelInput");
+    const docxList = document.getElementById("docxList");
+    const excelList = document.getElementById("excelList");
+    let selectedExcelFiles = [];
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return "";
+      if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function renderSingleFile(input, list) {
+      list.innerHTML = "";
+      const file = input.files[0];
+      if (!file) return;
+      const item = document.createElement("li");
+      item.innerHTML = `
+        <span class="file-name">${escapeHtml(file.name)}</span>
+        <span class="file-meta">${formatSize(file.size)}</span>
+      `;
+      list.appendChild(item);
+    }
+
+    function excelKey(file) {
+      return `${file.name}::${file.size}::${file.lastModified}`;
+    }
+
+    function setExcelFiles(files) {
+      const dt = new DataTransfer();
+      const seen = new Set();
+      for (const file of files) {
+        const key = excelKey(file);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        dt.items.add(file);
+      }
+      excelInput.files = dt.files;
+      selectedExcelFiles = [...excelInput.files];
+      renderExcelFiles();
+    }
+
+    function renderExcelFiles() {
+      excelList.innerHTML = "";
+      [...excelInput.files].forEach((file, index) => {
+        const item = document.createElement("li");
+        item.innerHTML = `
+          <span class="file-name">${escapeHtml(file.name)}</span>
+          <span class="file-meta">${formatSize(file.size)}</span>
+          <button type="button" class="remove-file" data-remove="${index}">Bớt</button>
+        `;
+        excelList.appendChild(item);
+      });
+    }
+
+    docxInput.addEventListener("change", () => renderSingleFile(docxInput, docxList));
+    excelInput.addEventListener("change", () => setExcelFiles(selectedExcelFiles.concat([...excelInput.files])));
+    excelList.addEventListener("click", (event) => {
+      const removeIndex = event.target.dataset.remove;
+      if (removeIndex === undefined) return;
+      setExcelFiles([...excelInput.files].filter((_file, index) => index !== Number(removeIndex)));
+    });
+  </script>
+</body>
+</html>

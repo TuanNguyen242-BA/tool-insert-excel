@@ -27,3 +27,5 @@ sessions/
 # Optional local LibreOffice bundle for preview. Keep binaries out of git.
 tools/libreoffice/
 tools/LibreOfficePortable/
+tools/LibreOfficePortableLibreOfficePortable/
+tools/LibreOfficePortable*/

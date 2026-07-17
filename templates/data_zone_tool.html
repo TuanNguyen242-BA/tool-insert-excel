@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mô tả dữ liệu theo phân vùng</title>
+  <style>
+    :root {
+      font-family: "Times New Roman", Times, serif;
+      color: #1f2933;
+      background: #f5f7fa;
+      --line: #d9e2ec;
+      --muted: #52606d;
+      --blue: #0f609b;
+      --blue-dark: #0b4f82;
+      --soft: #eef2f7;
+      --green: #2f8132;
+      --danger: #8a041a;
+    }
+    body { margin: 0; padding-bottom: 84px; }
+    main { max-width: 1280px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 18px; margin: 0 0 12px; }
+    h3 { font-size: 15px; margin: 14px 0 8px; }
+    label { display: block; font-weight: 700; margin: 10px 0 5px; }
+    input, select, textarea, button { box-sizing: border-box; font-family: inherit; font-size: 15px; }
+    input[type=file], input[type=text], textarea, select {
+      width: 100%; padding: 7px 8px; border: 1px solid #bcccdc; border-radius: 6px; background: #fff;
+    }
+    textarea { min-height: 78px; resize: vertical; line-height: 1.35; }
+    button, a.button {
+      display: inline-block; padding: 8px 12px; border: 0; border-radius: 6px; background: var(--blue);
+      color: white; font-weight: 700; cursor: pointer; text-decoration: none;
+    }
+    button:hover, a.button:hover { background: var(--blue-dark); }
+    button.secondary, a.secondary { background: #52606d; }
+    button.light { background: #d9e2ec; color: #243b53; }
+    button:disabled { background: #bcccdc; cursor: not-allowed; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .hint, .muted { color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+    .step {
+      height: 46px; padding: 7px 8px; background: #d9e2ec; color: #243b53;
+      border: 1px solid #bcccdc; border-radius: 6px; text-align: left; font-weight: 700;
+      display: flex; align-items: center; line-height: 1.15; overflow: hidden;
+    }
+    .step.active { background: var(--blue); color: white; border-color: var(--blue); }
+    .panel {
+      display: none; background: white; border: 1px solid var(--line); border-radius: 8px;
+      padding: 16px; min-height: 520px;
+    }
+    .panel.active { display: block; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+    .right-actions { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0; }
+    .metric { border: 1px solid var(--line); border-radius: 6px; padding: 12px; background: #f8fafc; }
+    .metric b { display: block; font-size: 24px; margin-top: 4px; }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 6px; max-height: 420px; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 7px; vertical-align: top; }
+    th { position: sticky; top: 0; background: #f0f4f8; text-align: left; z-index: 1; }
+    .check { display: flex; align-items: center; gap: 8px; font-weight: 400; margin: 12px 0; }
+    .error { background: #fff5f5; border: 1px solid #ffbdbd; color: var(--danger); padding: 10px; border-radius: 6px; white-space: pre-wrap; margin-top: 12px; }
+    .success { background: #e3f9e5; border: 1px solid #57ae5b; color: var(--green); padding: 10px; border-radius: 6px; margin-top: 12px; }
+    .spinner { display: none; color: var(--muted); margin-top: 10px; }
+    .spinner.active { display: block; }
+    .footer-nav {
+      display: flex; justify-content: flex-end; gap: 8px; position: fixed; left: 50%; bottom: 22px;
+      z-index: 20; width: min(1180px, calc(100vw - 40px)); transform: translateX(-50%); pointer-events: none;
+    }
+    .footer-nav button { pointer-events: auto; min-width: 108px; }
+    #prevStepBtn { margin-right: auto; }
+    @media (max-width: 860px) {
+      main { padding: 12px; }
+      .top { flex-direction: column; align-items: flex-start; }
+      .steps, .grid, .grid-3, .metrics { grid-template-columns: 1fr; }
+      .footer-nav { width: calc(100vw - 24px); bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <h1>Mô tả dữ liệu theo phân vùng</h1>
+        <p class="hint">Tạo Phụ lục 1 Raw Zone và Phụ lục 2 Work Zone từ một sheet nguồn.</p>
+      </div>
+      <a class="button secondary" href="/">Chọn module</a>
+    </div>
+
+    <div class="steps" id="steps"></div>
+
+    <section class="panel active" data-panel="1">
+      <h2>Bước 1: Chọn nguồn dữ liệu</h2>
+      <label>File nguồn dữ liệu (.xlsx/.xlsm)</label>
+      <input type="file" id="excelFile" accept=".xlsx,.xlsm">
+      <p class="hint">Sheet nguồn cần có các cột như Bảng đích, Trường đích, Ý nghĩa, Định dạng, Loại bảng, Mô tả bảng.</p>
+      <div id="uploadError"></div>
+    </section>
+
+    <section class="panel" data-panel="2">
+      <h2>Bước 2: Chọn sheet và cấu hình mặc định</h2>
+      <div class="grid">
+        <label>Sheet nguồn
+          <select id="sheetSelect"></select>
+        </label>
+        <label>Tên phân hệ / domain
+          <input type="text" id="domain">
+        </label>
+      </div>
+
+      <div class="grid-3">
+        <label>Raw zone
+          <input type="text" id="raw_zone">
+        </label>
+        <label>Work zone
+          <input type="text" id="work_zone">
+        </label>
+        <label>Thư mục good data
+          <input type="text" id="good_data_folder">
+        </label>
+      </div>
+
+      <div class="grid">
+        <label>Hệ thống nguồn mặc định
+          <input type="text" id="source_system_default">
+        </label>
+        <label>Topic Kafka prefix
+          <input type="text" id="raw_topic_prefix">
+        </label>
+      </div>
+
+      <div class="grid">
+        <label>Tần suất batch mặc định
+          <textarea id="batch_frequency"></textarea>
+        </label>
+        <label>Tần suất streaming mặc định
+          <textarea id="stream_frequency"></textarea>
+        </label>
+      </div>
+
+      <div class="grid-3">
+        <label>Prefix Master
+          <input type="text" id="master_prefix">
+        </label>
+        <label>Prefix Event
+          <input type="text" id="event_prefix">
+        </label>
+        <label>Prefix Reference
+          <input type="text" id="reference_prefix">
+        </label>
+      </div>
+
+      <div class="grid">
+        <label>Thời gian lưu trữ
+          <input type="text" id="retention">
+        </label>
+        <label>Định dạng lưu trữ
+          <input type="text" id="storage_format">
+        </label>
+      </div>
+
+      <label>Đường dẫn bad data
+        <input type="text" id="bad_data_path">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="add_lake_updated_time">
+        Thêm dòng lake_updated_time cho từng bảng trong phụ lục Work
+      </label>
+
+      <div class="spinner" id="previewSpinner">Đang đọc sheet nguồn...</div>
+      <div id="previewError"></div>
+    </section>
+
+    <section class="panel" data-panel="3">
+      <h2>Bước 3: Kiểm tra dữ liệu nhận diện</h2>
+      <div class="metrics" id="metrics"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Bảng nguồn</th>
+              <th>Bảng Work mặc định</th>
+              <th>Loại bảng</th>
+              <th>Số trường</th>
+              <th>Đường dẫn Raw</th>
+              <th>Đường dẫn Work</th>
+            </tr>
+          </thead>
+          <tbody id="previewRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="4">
+      <h2>Bước 4: Xuất file</h2>
+      <p class="hint">Kết quả tải về là một file zip gồm 2 file Excel phụ lục.</p>
+      <div class="spinner" id="generateSpinner">Đang tạo 2 file phụ lục...</div>
+      <div id="generateResult"></div>
+    </section>
+  </main>
+
+  <div class="footer-nav">
+    <button type="button" class="light" id="prevStepBtn" onclick="goStep(currentStep - 1)">Quay lại</button>
+    <button type="button" id="nextStepBtn" onclick="nextStep()">Tiếp theo</button>
+  </div>
+
+  <script>
+    const defaults = {{ default_options | tojson }};
+    const stepLabels = ["Upload", "Cấu hình", "Preview", "Xuất file"];
+    let currentStep = 1;
+    let lastPreview = null;
+
+    function fillDefaults() {
+      Object.entries(defaults).forEach(([key, value]) => {
+        const el = document.getElementById(key);
+        if (!el) return;
+        if (el.type === "checkbox") el.checked = Boolean(value);
+        else el.value = value ?? "";
+      });
+    }
+
+    function renderSteps() {
+      document.getElementById("steps").innerHTML = stepLabels.map((label, idx) => {
+        const n = idx + 1;
+        const cls = n === currentStep ? "step active" : "step";
+        return `<div class="${cls}">Bước ${n}: ${label}</div>`;
+      }).join("");
+      document.querySelectorAll(".panel").forEach(panel => {
+        panel.classList.toggle("active", Number(panel.dataset.panel) === currentStep);
+      });
+      document.getElementById("prevStepBtn").disabled = currentStep === 1;
+      const next = document.getElementById("nextStepBtn");
+      next.style.display = "inline-block";
+      next.textContent = {
+        1: "Đọc file",
+        2: "Xem preview",
+        3: "Tạo phụ lục",
+        4: "Tạo và tải file",
+      }[currentStep] || "Tiếp theo";
+    }
+
+    function goStep(step) {
+      currentStep = Math.max(1, Math.min(4, step));
+      renderSteps();
+    }
+
+    function nextStep() {
+      if (currentStep === 1) inspectWorkbook();
+      else if (currentStep === 2) previewWorkbook();
+      else if (currentStep === 4) generateFiles();
+      else goStep(currentStep + 1);
+    }
+
+    function selectedFile() {
+      return document.getElementById("excelFile").files[0];
+    }
+
+    function optionsPayload() {
+      const payload = {};
+      Object.keys(defaults).forEach(key => {
+        const el = document.getElementById(key);
+        if (!el) return;
+        payload[key] = el.type === "checkbox" ? el.checked : el.value;
+      });
+      return payload;
+    }
+
+    function formData(includeSheet = true) {
+      const file = selectedFile();
+      if (!file) throw new Error("Vui lòng chọn file nguồn dữ liệu.");
+      const form = new FormData();
+      form.append("excel_file", file);
+      if (includeSheet) form.append("sheet_name", document.getElementById("sheetSelect").value || "");
+      form.append("options_json", JSON.stringify(optionsPayload()));
+      return form;
+    }
+
+    async function inspectWorkbook() {
+      document.getElementById("uploadError").innerHTML = "";
+      try {
+        const form = formData(false);
+        const res = await fetch("/data-zone/inspect", {method: "POST", body: form});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Không đọc được file.");
+        const select = document.getElementById("sheetSelect");
+        select.innerHTML = data.sheets.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+        select.value = data.selected_sheet || "";
+        lastPreview = null;
+        goStep(2);
+      } catch (err) {
+        document.getElementById("uploadError").innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function previewWorkbook() {
+      document.getElementById("previewError").innerHTML = "";
+      document.getElementById("previewSpinner").classList.add("active");
+      try {
+        const res = await fetch("/data-zone/inspect", {method: "POST", body: formData(true)});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Không đọc được sheet.");
+        lastPreview = data.summary;
+        renderPreview(data.summary);
+        goStep(3);
+      } catch (err) {
+        document.getElementById("previewError").innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      } finally {
+        document.getElementById("previewSpinner").classList.remove("active");
+      }
+    }
+
+    function renderPreview(summary) {
+      if (!summary) return;
+      document.getElementById("metrics").innerHTML = [
+        ["Số bảng", summary.table_count],
+        ["Số trường", summary.field_count],
+        ["Preview", summary.truncated ? `${summary.tables.length}+` : summary.tables.length],
+      ].map(([label, value]) => `<div class="metric"><span class="muted">${label}</span><b>${value}</b></div>`).join("");
+      document.getElementById("previewRows").innerHTML = (summary.tables || []).map(row => `
+        <tr>
+          <td>${row.stt}</td>
+          <td>${escapeHtml(row.table_name)}</td>
+          <td>${escapeHtml(row.work_table_name)}</td>
+          <td>${escapeHtml(row.table_type)}</td>
+          <td>${row.fields}</td>
+          <td>${escapeHtml(row.raw_path)}</td>
+          <td>${escapeHtml(row.work_path)}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function generateFiles() {
+      const spinner = document.getElementById("generateSpinner");
+      const result = document.getElementById("generateResult");
+      result.innerHTML = "";
+      spinner.classList.add("active");
+      try {
+        const res = await fetch("/data-zone/generate", {method: "POST", body: formData(true)});
+        if (!res.ok) {
+          let message = "Tạo file lỗi.";
+          try {
+            const data = await res.json();
+            message = data.detail || message;
+          } catch (_err) {}
+          throw new Error(message);
+        }
+        const blob = await res.blob();
+        const disposition = res.headers.get("content-disposition") || "";
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const filename = match ? match[1] : "phu_luc_raw_work.zip";
+        const url = URL.createObjectURL(blob);
+        result.innerHTML = `<div class="success">Đã tạo xong 2 phụ lục.</div><p><a class="button" href="${url}" download="${escapeHtml(filename)}">Tải file zip</a></p>`;
+      } catch (err) {
+        result.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      } finally {
+        spinner.classList.remove("active");
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    fillDefaults();
+    renderSteps();
+  </script>
+</body>
+</html>

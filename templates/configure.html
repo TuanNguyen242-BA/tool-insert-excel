@@ -15,7 +15,7 @@
       --blue-dark: #0b4f82;
       --soft: #eef2f7;
     }
-    body { margin: 0; }
+    body { margin: 0; padding-bottom: 88px; }
     main { max-width: 1280px; margin: 0 auto; padding: 20px; }
     h1 { font-size: 22px; margin: 0 0 8px; }
     h2 { font-size: 18px; margin: 0 0 12px; }
@@ -53,7 +53,7 @@
     .meta { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
     .tabs {
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(8, minmax(0, 1fr));
       gap: 6px;
       margin-bottom: 12px;
     }
@@ -86,8 +86,15 @@
       display: flex;
       justify-content: flex-end;
       gap: 8px;
-      margin-top: 14px;
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 20;
+      width: min(1280px, calc(100vw - 40px));
+      transform: translateX(-50%);
+      pointer-events: none;
     }
+    .footer-nav button { pointer-events: auto; min-width: 108px; }
     #prevStepBtn { margin-right: auto; }
     .narrow { width: 84px !important; }
     .tiny { width: 54px !important; }
@@ -107,6 +114,79 @@
       border-radius: 6px;
       background: white;
     }
+    .advanced-row {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .advanced-source-columns {
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid #bcccdc;
+      border-radius: 6px;
+      background: white;
+    }
+    .advanced-source-list .merge-column-row {
+      grid-template-columns: minmax(0, 1fr) 72px;
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(31, 41, 51, 0.45);
+    }
+    .modal-backdrop.active { display: flex; }
+    .modal-dialog {
+      width: min(760px, calc(100vw - 32px));
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 18px 45px rgba(31, 41, 51, 0.25);
+      padding: 16px;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .modal-header h3 { margin: 0; }
+    .modal-section {
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .merge-column-list {
+      max-height: 190px;
+      overflow: auto;
+      border: 1px solid #bcccdc;
+      border-radius: 6px;
+      padding: 6px;
+    }
+    .merge-column-row {
+      display: grid;
+      grid-template-columns: 24px 54px minmax(0, 1fr);
+      gap: 6px;
+      align-items: start;
+      padding: 5px 2px;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .merge-column-row:last-child { border-bottom: 0; }
     .action-layout {
       display: grid;
       grid-template-columns: minmax(520px, 1.2fr) minmax(360px, 0.8fr);
@@ -120,6 +200,7 @@
       padding: 12px;
       min-height: 260px;
     }
+    #docInfo { min-height: 0; }
     .pill {
       display: inline-block;
       min-width: 70px;
@@ -133,9 +214,74 @@
     }
     .pill.insert { background: #e6f6ff; color: #035388; }
     .pill.empty { background: #fff3c4; color: #8d2b0b; }
+    tr.selected-excel-heading td {
+      background: #e6f6ff;
+      box-shadow: inset 0 1px 0 #62b0e8, inset 0 -1px 0 #62b0e8;
+    }
+    tr.selected-excel-heading td:first-child {
+      box-shadow: inset 3px 0 0 var(--blue), inset 0 1px 0 #62b0e8, inset 0 -1px 0 #62b0e8;
+    }
+    .heading-action-cell {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      line-height: 1.2;
+    }
+    .heading-action-text {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .step6-toolbar {
+      align-items: center;
+    }
+    .step6-font-field {
+      margin-top: -14px;
+    }
+    .column-config-row {
+      display: grid;
+      grid-template-columns: 24px 46px minmax(130px, 1fr) minmax(130px, 1fr) 72px;
+      gap: 6px;
+      align-items: center;
+      padding: 5px 4px;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .column-config-row:last-child { border-bottom: 0; }
+    .column-config-row input[type=text] { padding: 5px 6px; }
+    .toc-layout {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.45fr) minmax(640px, 1fr);
+      gap: 14px;
+    }
+    .toc-style-grid {
+      display: grid;
+      grid-template-columns: 64px minmax(150px, 1.2fr) 70px 62px 82px 90px 72px 72px 72px;
+      gap: 6px;
+      align-items: center;
+      min-width: 860px;
+    }
+    .toc-style-grid.header {
+      font-weight: 700;
+      color: var(--muted);
+      background: #f0f4f8;
+      padding: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+    .toc-style-row {
+      padding: 5px 6px;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .column-move {
+      display: flex;
+      gap: 3px;
+    }
+    .column-move button {
+      padding: 4px 7px;
+      min-width: 0;
+    }
     @media (max-width: 980px) {
       .tabs { grid-template-columns: 1fr 1fr; }
-      .grid-2, .grid-3, .action-layout { grid-template-columns: 1fr; }
+      .grid-2, .grid-3, .action-layout, .toc-layout { grid-template-columns: 1fr; }
       main { padding: 12px; }
     }
   </style>
@@ -154,8 +300,10 @@
       <input type="hidden" id="sectionsInput" name="sections_json">
       <input type="hidden" id="introReplInput" name="intro_replacements_json">
       <input type="hidden" id="headingStylesInput" name="heading_styles_json">
+      <input type="hidden" id="tocSettingsInput" name="toc_settings_json">
       <input type="hidden" id="headerFooterInput" name="header_footer_text_json">
       <input type="hidden" id="headingsConfigInput" name="headings_config_json">
+      <input type="hidden" id="step6SetupInput" name="step6_setup_json">
       <input type="hidden" id="preserveInlineInput" name="preserve_inline_formatting" value="true">
 
       <div class="tabs" role="tablist">
@@ -165,7 +313,8 @@
         <button type="button" class="tab-btn" data-step="4">4. Headings/H&F</button>
         <button type="button" class="tab-btn" data-step="5">5. Danh sách heading</button>
         <button type="button" class="tab-btn" data-step="6">6. Giữ/xoá/chèn</button>
-        <button type="button" class="tab-btn" data-step="7">7. Lưu template</button>
+        <button type="button" class="tab-btn" data-step="7">7. Mục lục</button>
+        <button type="button" class="tab-btn" data-step="8">8. Preview & tải</button>
       </div>
 
       <section class="panel active" data-panel="1">
@@ -234,7 +383,7 @@
 
       <section class="panel" data-panel="5">
         <h2>Bước 5: Danh sách heading</h2>
-        <div class="toolbar">
+        <div class="toolbar step6-toolbar">
           <button type="button" class="light" onclick="addHeading()">+ Thêm heading</button>
           <label style="display:flex; gap:6px; align-items:center; margin:0;">
             <input type="checkbox" id="autoNumberCheck" onchange="syncHeadingAutoNumber()"> Tự động chèn số thứ tự
@@ -253,14 +402,20 @@
         <div class="toolbar">
           <button type="button" class="light" onclick="setAllActions('keep')">Tất cả: Giữ</button>
           <button type="button" class="light" onclick="setAllActions('empty')">Tất cả: Để trống</button>
+          <button type="button" class="light" onclick="exportStep6Setup()">Export setup</button>
+          <button type="button" class="light" onclick="document.getElementById('step6SetupImport').click()">Import setup</button>
+          <input type="file" id="step6SetupImport" accept="application/json,.json" style="display:none" onchange="importStep6SetupFile(this)">
+          <button type="button" class="light" onclick="document.getElementById('additionalExcelInput').click()">Thêm Excel</button>
+          <input type="file" id="additionalExcelInput" accept=".xlsx,.xlsm" multiple style="display:none" onchange="uploadAdditionalExcelFiles(this)">
+          <span class="muted" id="excelUploadStatus"></span>
           <label style="display:flex; gap:6px; align-items:center; margin:0 0 0 8px;">
             <input type="checkbox" id="preserveInlineCheck" checked> Giữ bold/italic/underline từ Excel
           </label>
-          <div style="width:190px">
+          <div class="step6-font-field" style="width:190px">
             <label style="margin:0 0 3px">Font Excel</label>
             <input type="text" name="excel_font_name" value="" placeholder="Times New Roman">
           </div>
-          <div style="width:110px">
+          <div class="step6-font-field" style="width:110px">
             <label style="margin:0 0 3px">Cỡ Excel</label>
             <input type="number" name="excel_font_size" value="11" min="6" max="20" step="0.5">
           </div>
@@ -274,6 +429,8 @@
           </div>
           <div>
             <h3 id="excelConfigTitle">Cấu hình Excel</h3>
+            <label>File Excel</label>
+            <select id="excelFileSelect" onchange="changeExcelFile()"></select>
             <label>Sheet</label>
             <select id="excelSheetSelect" onchange="changeExcelSheet()"></select>
             <div class="toolbar">
@@ -293,15 +450,58 @@
               </div>
             </div>
             <p class="muted">Spec cột: <span id="columnsPreview">(chưa chọn)</span></p>
+            <div class="advanced-row">
+              <button type="button" class="light" onclick="openAdvancedSettings()">Cài đặt nâng cao</button>
+              <span class="muted" id="advancedPreview"></span>
+            </div>
           </div>
         </div>
       </section>
 
       <section class="panel" data-panel="7">
-        <h2>Bước 7: Tổng kết & lưu template</h2>
+        <h2>Bước 7: Cấu hình style mục lục</h2>
+        <p class="muted">
+          Các thiết lập này áp cho style TOC1..TOC9. Khi tạo file, mục lục sẽ được đánh dấu để Word cập nhật lại số trang và render theo style mới.
+        </p>
+        <div class="toc-layout">
+          <div>
+            <h3>Thiết lập chung</h3>
+            <label style="display:flex; gap:6px; align-items:center;">
+              <input type="checkbox" id="tocEnabledCheck"> Áp dụng style TOC
+            </label>
+            <label style="display:flex; gap:6px; align-items:center;">
+              <input type="checkbox" id="tocUpdateCheck"> Cập nhật mục lục khi mở file
+            </label>
+            <label>Lấy heading level</label>
+            <select id="tocLevelsSelect"></select>
+            <label>Tab leader số trang</label>
+            <select id="tocLeaderSelect">
+              <option value="none">none</option>
+              <option value="dot">dot</option>
+              <option value="hyphen">hyphen</option>
+              <option value="underscore">underscore</option>
+            </select>
+            <label>Right tab (cm)</label>
+            <input type="number" id="tocRightTabInput" min="0" step="0.1">
+            <p class="muted">Để 0 để tự tính theo vùng nội dung của trang.</p>
+          </div>
+          <div>
+            <h3>TOC styles</h3>
+            <div class="scroll">
+              <div class="toc-style-grid header">
+                <span>Style</span><span>Font</span><span>Size</span><span>Bold</span><span>Indent</span><span>Text tab</span><span>Before</span><span>After</span><span>Line</span>
+              </div>
+              <div id="tocStylesBody"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="8">
+        <h2>Bước 8: Tổng kết & preview trước khi tải</h2>
         <div class="summary" id="summaryBox"></div>
         <div class="toolbar" style="justify-content:flex-end">
-          <button type="submit">{% if cloud_mode %}Tạo job generate{% else %}Generate và tải DOCX{% endif %}</button>
+          <button type="submit">Tạo bản preview</button>
         </div>
       </section>
 
@@ -312,13 +512,219 @@
     </form>
   </main>
 
+  <div class="modal-backdrop" id="advancedModal" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="advancedModalTitle">
+      <div class="modal-header">
+        <h3 id="advancedModalTitle">Cài đặt nâng cao</h3>
+        <button type="button" class="light" onclick="closeAdvancedSettings()">Đóng</button>
+      </div>
+      <div class="modal-section" style="border-top:0; padding-top:0; margin-top:0">
+        <label style="display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" id="advSplitEnabled" onchange="refreshAdvancedDialogState()"> Tách bảng theo giá trị của một cột
+        </label>
+        <label>Cột dùng để tách</label>
+        <select id="advSplitColumn"></select>
+      </div>
+      <div class="modal-section">
+        <label style="display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" id="advAddHeading" onchange="refreshAdvancedDialogState()"> Chèn heading trước mỗi bảng được tách
+        </label>
+        <div class="grid-2">
+          <div>
+            <label>Text phần đầu</label>
+            <input type="text" id="advHeadingPrefix" placeholder="Bảng ">
+          </div>
+          <div>
+            <label>Text phần cuối</label>
+            <input type="text" id="advHeadingSuffix" placeholder="N/A = bỏ trống">
+          </div>
+        </div>
+        <p class="muted">Tên heading = phần đầu + giá trị của cột tách + phần cuối.</p>
+        <div class="grid-3">
+          <div>
+            <label>Font heading</label>
+            <input type="text" id="advHeadingFont" placeholder="Times New Roman">
+          </div>
+          <div>
+            <label>Cỡ heading</label>
+            <input type="number" id="advHeadingSize" min="6" max="36" step="0.5" placeholder="13">
+          </div>
+          <div>
+            <label>Màu heading</label>
+            <input type="text" id="advHeadingColor" placeholder="000000">
+          </div>
+        </div>
+        <div class="toolbar" style="margin-bottom:0">
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="advHeadingBold"> Bold
+          </label>
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="advHeadingItalic"> Italic
+          </label>
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="advHeadingUnderline"> Underline
+          </label>
+        </div>
+      </div>
+      <div class="modal-section">
+        <label style="display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" id="advAutoStt"> Tự thêm cột STT ở bên trái
+        </label>
+        <p class="muted">Nếu cột ngay sau STT đang được merge dọc, STT sẽ đánh số và merge theo từng cụm giá trị; nếu không merge, STT đánh số từng dòng.</p>
+      </div>
+      <div class="modal-section">
+        <label style="display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" id="advInternalLink" onchange="refreshAdvancedDialogState()"> Gắn hyperlink nội bộ tài liệu
+        </label>
+        <div class="grid-2">
+          <div>
+            <label>Cột gắn hyperlink</label>
+            <select id="advInternalLinkColumn"></select>
+          </div>
+          <div>
+            <label>Heading chứa đích tham chiếu</label>
+            <select id="advInternalLinkTarget"></select>
+          </div>
+        </div>
+        <p class="muted">Giá trị trong cột hyperlink sẽ được so với heading con đã có hoặc heading con sinh khi tách bảng.</p>
+      </div>
+      <div class="modal-section">
+        <label>Tách thêm từ nhiều bảng nguồn</label>
+        <div class="grid-2">
+          <div>
+            <label>Kiểu trình bày</label>
+            <select id="advMultiSourceMode" onchange="refreshAdvancedDialogState()">
+              <option value="sequential">Tách hết nguồn 1 rồi đến nguồn tiếp theo</option>
+              <option value="interleave">Xen kẽ theo nhóm giá trị</option>
+            </select>
+          </div>
+          <div>
+            <label>File Excel</label>
+            <select id="advSourceFileSelect" onchange="changeAdvancedSourceFile()"></select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <label>Sheet</label>
+            <select id="advSourceSheetSelect" onchange="changeAdvancedSourceSheet()"></select>
+          </div>
+          <div>
+            <label>Cột dùng để tách</label>
+            <select id="advSourceSplitColumn"></select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <label>Dòng bắt đầu</label>
+            <input type="number" id="advSourceRowStart" min="1" value="1">
+          </div>
+          <div>
+            <label>Dòng kết thúc</label>
+            <input type="text" id="advSourceRowEnd" placeholder="Rỗng = hết data">
+          </div>
+        </div>
+        <div class="grid-3">
+          <div>
+            <label style="display:flex; gap:6px; align-items:center;">
+              <input type="checkbox" id="advInterleaveGroupHeading" onchange="refreshAdvancedDialogState()"> Chèn heading cụm
+            </label>
+          </div>
+          <div>
+            <label>Text đầu heading cụm</label>
+            <input type="text" id="advInterleaveGroupPrefix" placeholder="Cụm ">
+          </div>
+          <div>
+            <label>Text cuối heading cụm</label>
+            <input type="text" id="advInterleaveGroupSuffix" placeholder="Bỏ trống nếu không cần">
+          </div>
+        </div>
+        <p class="muted">Khi chèn xen kẽ, heading cụm = text đầu + giá trị tách của nguồn đầu tiên trong cụm + text cuối. Các bảng trong cụm sẽ nằm dưới heading này.</p>
+        <div class="toolbar" style="margin:6px 0;">
+          <button type="button" class="light" onclick="setAdvancedSourceColumns('first7')">Chọn 7 cột đầu</button>
+          <button type="button" class="light" onclick="setAdvancedSourceColumns('all')">Chọn tất cả</button>
+          <button type="button" class="light" onclick="setAdvancedSourceColumns('none')">Bỏ chọn</button>
+          <button type="button" class="light" onclick="addAdvancedSplitSource()">Thêm nguồn</button>
+        </div>
+        <div id="advSourceColumnsBox" class="advanced-source-columns"></div>
+        <p class="muted">Nguồn phụ sẽ được lưu vào danh sách bên dưới. Nếu bạn quên bấm "Thêm nguồn", khi lưu cài đặt hệ thống sẽ tự thêm lựa chọn hiện tại.</p>
+        <div id="advSplitSourcesList" class="merge-column-list advanced-source-list" style="margin-top:8px;"></div>
+      </div>
+      <div class="modal-section">
+        <label>Chèn đoạn văn bản theo từng bảng tách</label>
+        <div class="grid-2">
+          <div>
+            <label>File Excel tham chiếu</label>
+            <select id="advTextRuleFile" onchange="changeAdvancedTextRuleFile()"></select>
+          </div>
+          <div>
+            <label>Sheet</label>
+            <select id="advTextRuleSheet" onchange="changeAdvancedTextRuleSheet()"></select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <label>Cột so khớp với giá trị tách</label>
+            <select id="advTextRuleKeyColumn"></select>
+          </div>
+          <div>
+            <label>Cột lấy nội dung</label>
+            <select id="advTextRuleValueColumn"></select>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div>
+            <label>Nội dung nhập trước</label>
+            <textarea id="advTextRulePrefix" rows="3" placeholder="Cách tổng hợp chi tiết:&#10;"></textarea>
+          </div>
+          <div>
+            <label>Dòng bắt đầu</label>
+            <input type="number" id="advTextRuleRowStart" min="1" value="1">
+          </div>
+          <div>
+            <label>Dòng kết thúc</label>
+            <input type="text" id="advTextRuleRowEnd" placeholder="Rỗng = hết data">
+          </div>
+        </div>
+        <div class="toolbar" style="margin:6px 0;">
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="advTextRulePrefixBold"> Bold text nhập
+          </label>
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="advTextRulePrefixItalic"> Italic text nhập
+          </label>
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="advTextRulePrefixUnderline"> Underline text nhập
+          </label>
+          <label style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="checkbox" id="advTextRuleForceLeft" checked> Ép căn trái
+          </label>
+        </div>
+        <div class="toolbar" style="margin:6px 0;">
+          <button type="button" class="light" onclick="addAdvancedTextRule()">Thêm đoạn văn bản</button>
+        </div>
+        <div id="advTextRulesList" class="merge-column-list advanced-source-list"></div>
+      </div>
+      <div class="modal-section">
+        <label>Cột tự merge các ô liền nhau có giá trị giống nhau</label>
+        <div id="advMergeColumns" class="merge-column-list"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="light" onclick="closeAdvancedSettings()">Hủy</button>
+        <button type="button" onclick="saveAdvancedSettings()">Lưu cài đặt</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const allHeadings = {{ all_headings | tojson }};
-    const sheets = {{ sheets | tojson }};
+    let excelFiles = {{ excel_files | default([]) | tojson }};
+    let sheets = {{ sheets | tojson }};
     const initialIntro = {{ intro | tojson }};
     const initialDefaults = {{ doc_defaults | tojson }};
     const initialSections = {{ sections | tojson }};
     const initialHeadingStyles = {{ heading_styles | tojson }};
+    const initialTocSettings = {{ toc_settings | default({}) | tojson }};
+    const savedPayload = {{ saved_payload | default({}) | tojson }};
     const introTextBlocks = {{ intro_text_blocks | tojson }};
     const headerFooterText = {{ header_footer_text | tojson }};
     const naPlaceholderHeadingIndexes = new Set({{ na_placeholder_heading_indexes | default([]) | tojson }});
@@ -327,6 +733,7 @@
     let currentStep = 1;
     let headingsState = [];
     let selectedExcelHeading = 0;
+    let importedStep6Payload = null;
 
     const fieldLabels = {
       font: "Font",
@@ -345,6 +752,34 @@
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;");
+    }
+
+    function deepClone(value) {
+      return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+    }
+
+    function markHeadingDirty(index) {
+      if (headingsState[index]) headingsState[index]._dirty = true;
+    }
+
+    function cleanHeadingForExport(h) {
+      const selection = h.action === "insert" && h.insert_selection
+        ? deepClone(h.insert_selection)
+        : nullSelectionTemplate();
+      if (h.action === "insert" && selection) selection.file_name = excelFileName(selection.file_id);
+      return {
+        level: h.level,
+        text: h.text,
+        original_idx: h.original_idx,
+        action: h.action,
+        auto_number: h.auto_number,
+        insert_selection: selection
+      };
+    }
+
+    function headingForStep6Export(h) {
+      if (h._setupRaw && !h._dirty) return deepClone(h._setupRaw);
+      return cleanHeadingForExport(h);
     }
 
     function letterFromIndex(n) {
@@ -372,6 +807,18 @@
       return parts.join(",");
     }
 
+    function colSpecFromOrderedIndexes(indexes) {
+      const seen = new Set();
+      const ordered = [];
+      for (const raw of indexes) {
+        const n = Number(raw);
+        if (!n || seen.has(n)) continue;
+        seen.add(n);
+        ordered.push(n);
+      }
+      return ordered.map(letterFromIndex).join(",");
+    }
+
     function indexesFromSpec(spec) {
       const result = [];
       for (const raw of String(spec || "").split(",")) {
@@ -397,20 +844,236 @@
       return result;
     }
 
-    function sheetByName(name) {
-      return sheets.find(s => s.name === name) || sheets[0] || {name: "", columns: [], header_row: 1};
+    function sheetsForFile(fileId) {
+      const targetFileId = fileId || (excelFiles[0] && excelFiles[0].id) || (sheets[0] && sheets[0].file_id) || "";
+      const filtered = sheets.filter(s => (s.file_id || "") === targetFileId);
+      return filtered.length ? filtered : sheets;
     }
 
-    function defaultSelection(sheetName) {
-      const sheet = sheetByName(sheetName || (sheets[0] && sheets[0].name));
+    function sheetByName(fileId, name) {
+      return sheets.find(s => (s.file_id || "") === (fileId || "") && s.name === name)
+        || sheets.find(s => s.name === name)
+        || sheets[0]
+        || {file_id: "", file_name: "", name: "", columns: [], header_row: 1};
+    }
+
+    function defaultSelection(fileId, sheetName) {
+      const fileSheets = sheetsForFile(fileId);
+      const sheet = sheetByName(fileId || (fileSheets[0] && fileSheets[0].file_id), sheetName || (fileSheets[0] && fileSheets[0].name));
       const defaultCols = colSpecFromIndexes((sheet.columns || []).slice(0, 7).map(c => c.index));
       return {
         mode: "custom",
+        file_id: sheet.file_id || "",
         sheet: sheet.name || "",
         columns: defaultCols,
         row_start: sheet.header_row || 1,
-        row_end: null
+        row_end: null,
+        advanced: defaultAdvancedSettings()
       };
+    }
+
+    function nullSelectionTemplate() {
+      return {
+        mode: null,
+        file_id: null,
+        file_name: null,
+        sheet: null,
+        columns: null,
+        row_start: null,
+        row_end: null,
+        range: null,
+        header_overrides: null,
+        advanced: nullAdvancedSettings()
+      };
+    }
+
+    function selectionHasConfig(selection) {
+      return Boolean(selection && selection.mode);
+    }
+
+    function defaultAdvancedSettings() {
+      return {
+        split_enabled: false,
+        split_column: "",
+        add_split_heading: false,
+        heading_prefix: "Bảng ",
+        heading_suffix: "",
+        heading_font: "",
+        heading_size_pt: "",
+        heading_bold: false,
+        heading_italic: false,
+        heading_underline: false,
+        heading_color: "",
+        auto_stt_enabled: false,
+        internal_link_enabled: false,
+        internal_link_column: "",
+        internal_link_target_heading_original_idx: "",
+        multi_source_mode: "sequential",
+        interleave_group_heading_enabled: true,
+        interleave_group_heading_prefix: "Cụm ",
+        interleave_group_heading_suffix: "",
+        split_source_draft: null,
+        split_sources: [],
+        split_text_rules: [],
+        merge_columns: []
+      };
+    }
+
+    function nullAdvancedSettings() {
+      return {
+        split_enabled: null,
+        split_column: null,
+        add_split_heading: null,
+        heading_prefix: null,
+        heading_suffix: null,
+        heading_font: null,
+        heading_size_pt: null,
+        heading_bold: null,
+        heading_italic: null,
+        heading_underline: null,
+        heading_color: null,
+        auto_stt_enabled: null,
+        internal_link_enabled: null,
+        internal_link_column: null,
+        internal_link_target_heading_original_idx: null,
+        multi_source_mode: null,
+        interleave_group_heading_enabled: null,
+        interleave_group_heading_prefix: null,
+        interleave_group_heading_suffix: null,
+        split_source_draft: null,
+        split_sources: null,
+        split_text_rules: null,
+        merge_columns: null
+      };
+    }
+
+    function ensureAdvancedSettings(selection) {
+      if (!selection) return defaultAdvancedSettings();
+      const current = selection.advanced && typeof selection.advanced === "object" ? selection.advanced : {};
+      selection.advanced = {
+        ...defaultAdvancedSettings(),
+        ...current,
+        merge_columns: Array.isArray(current.merge_columns) ? current.merge_columns.map(Number).filter(Boolean) : [],
+        split_source_draft: current.split_source_draft && typeof current.split_source_draft === "object" ? current.split_source_draft : null,
+        split_sources: Array.isArray(current.split_sources) ? current.split_sources : [],
+        split_text_rules: Array.isArray(current.split_text_rules) ? current.split_text_rules : []
+      };
+      return selection.advanced;
+    }
+
+    function excelFileName(fileId) {
+      const found = excelFiles.find(f => f.id === fileId);
+      return found ? found.name : (fileId || "");
+    }
+
+    function excelFilePath(fileId) {
+      const found = excelFiles.find(f => f.id === fileId);
+      return found ? (found.path || "") : "";
+    }
+
+    function normalizeSetupText(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[đĐ]/g, "d")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+    }
+
+    function normalizeExcelFileNameForMatch(value) {
+      return normalizeSetupText(value)
+        .replace(/\.(xlsx|xlsm|xls)$/i, "")
+        .replace(/^\s*(copy\s+of|ban\s+sao\s+cua)\s+/i, "")
+        .replace(/\[[^\]]*\]|\([^)]*\)/g, " ")
+        .replace(/[_\-]+/g, " ")
+        .replace(/\b(csdl|v\d+|version|final|new|moi|upload|duoc)\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function appendixKeyFromFileName(value) {
+      const text = normalizeExcelFileNameForMatch(value);
+      const match = text.match(/\bphu\s*luc\s*([0-9]+|x)\b/);
+      return match ? match[1] : "";
+    }
+
+    function tokenSet(value) {
+      const stop = new Set(["phu", "luc", "csdl", "luong", "file", "excel"]);
+      return new Set(
+        normalizeExcelFileNameForMatch(value)
+          .split(/\s+/)
+          .filter(t => t.length >= 2 && !stop.has(t))
+      );
+    }
+
+    function excelFileNameSimilarity(a, b) {
+      const na = normalizeExcelFileNameForMatch(a);
+      const nb = normalizeExcelFileNameForMatch(b);
+      if (!na || !nb) return 0;
+      if (na === nb) return 1;
+      const appendixA = appendixKeyFromFileName(na);
+      const appendixB = appendixKeyFromFileName(nb);
+      let score = appendixA && appendixA === appendixB ? 0.45 : 0;
+      const tokensA = tokenSet(na);
+      const tokensB = tokenSet(nb);
+      const intersection = [...tokensA].filter(t => tokensB.has(t)).length;
+      const union = new Set([...tokensA, ...tokensB]).size || 1;
+      score += (intersection / union) * 0.55;
+      return score;
+    }
+
+    function findBestExcelFileBySetupName(wantedName) {
+      let best = null;
+      let bestScore = 0;
+      for (const file of excelFiles) {
+        const score = excelFileNameSimilarity(wantedName, file.name);
+        if (score > bestScore) {
+          best = file;
+          bestScore = score;
+        }
+      }
+      return bestScore >= 0.45 ? best : null;
+    }
+
+    function headingSetupKey(h) {
+      return `${Number(h.level || 1)}|${normalizeSetupText(h.text)}`;
+    }
+
+    function remapExcelSourceFileId(source) {
+      if (!source) return "";
+      const currentById = excelFiles.find(f => f.id === source.file_id);
+      if (currentById) return source.file_id;
+      const wantedName = source.file_name || source.excel_file_name || source.file_id || "";
+      const currentByName = excelFiles.find(f => f.name === wantedName);
+      if (currentByName) return currentByName.id;
+      const fuzzyMatch = findBestExcelFileBySetupName(wantedName);
+      if (fuzzyMatch) return fuzzyMatch.id;
+      return excelFiles[0] ? excelFiles[0].id : (source.file_id || "");
+    }
+
+    function remapSetupFileId(selection) {
+      if (!selection) return selection;
+      selection.file_id = remapExcelSourceFileId(selection);
+      selection.file_name = excelFileName(selection.file_id);
+      selection.source_path = excelFilePath(selection.file_id);
+      if (selection.advanced && Array.isArray(selection.advanced.split_sources)) {
+        selection.advanced.split_sources = selection.advanced.split_sources.map(src => ({
+          ...src,
+          file_id: remapExcelSourceFileId(src),
+          file_name: excelFileName(remapExcelSourceFileId(src)),
+          source_path: excelFilePath(remapExcelSourceFileId(src))
+        }));
+      }
+      if (selection.advanced && Array.isArray(selection.advanced.split_text_rules)) {
+        selection.advanced.split_text_rules = selection.advanced.split_text_rules.map(rule => ({
+          ...rule,
+          file_id: remapExcelSourceFileId(rule),
+          file_name: excelFileName(remapExcelSourceFileId(rule)),
+          source_path: excelFilePath(remapExcelSourceFileId(rule))
+        }));
+      }
+      return selection;
     }
 
     function buildInitialHeadings() {
@@ -423,7 +1086,9 @@
           original_idx: Number(h.original_idx),
           action: naPlaceholderHeadingIndexes.has(Number(h.original_idx)) ? "empty" : "keep",
           auto_number: false,
-          insert_selection: defaultSelection()
+          insert_selection: nullSelectionTemplate(),
+          _dirty: true,
+          _setupRaw: null
         }));
       selectedExcelHeading = headingsState.length ? 0 : -1;
       renderHeadingList();
@@ -449,6 +1114,13 @@
       document.getElementById("docInfo").textContent =
         `Số trang: ${pages}\nSố heading phát hiện: ${allHeadings.length}\nSố sheet Excel: ${sheets.length}`;
       renderAllHeadings();
+    }
+
+    function refreshDocInfo() {
+      const docInfo = document.getElementById("docInfo");
+      if (!docInfo) return;
+      docInfo.textContent =
+        `Số trang: ${pages}\nSố heading phát hiện: ${allHeadings.length}\nSố sheet Excel: ${sheets.length}`;
     }
 
     function renderAllHeadings() {
@@ -537,6 +1209,83 @@
       }
     }
 
+    function fallbackTocSettings() {
+      const font = initialDefaults.font || "Times New Roman";
+      const size = Number(initialDefaults.size_pt || 13);
+      const styles = {};
+      for (let level = 1; level <= 9; level++) {
+        const left = level === 1 ? 0 : Number((0.55 + (level - 2) * 0.5).toFixed(2));
+        styles[`TOC${level}`] = {
+          font,
+          size_pt: size,
+          bold: level <= 2,
+          italic: false,
+          color: "000000",
+          left_indent_cm: left,
+          text_tab_cm: Number((left + 0.55 + Math.max(level - 1, 0) * 0.12).toFixed(2)),
+          space_before_pt: 0,
+          space_after_pt: level <= 3 ? 2 : 1,
+          line_spacing: "1.15"
+        };
+      }
+      return {
+        enabled: true,
+        update_on_open: true,
+        levels: 4,
+        tab_leader: "none",
+        right_tab_cm: 0,
+        styles
+      };
+    }
+
+    function mergedTocSettings() {
+      const base = fallbackTocSettings();
+      const incoming = initialTocSettings || {};
+      const out = {...base, ...incoming, styles: {...base.styles}};
+      for (const [sid, data] of Object.entries(incoming.styles || {})) {
+        out.styles[sid] = {...(out.styles[sid] || {}), ...data};
+      }
+      return out;
+    }
+
+    function renderTocStyles() {
+      const cfg = mergedTocSettings();
+      document.getElementById("tocEnabledCheck").checked = cfg.enabled !== false;
+      document.getElementById("tocUpdateCheck").checked = cfg.update_on_open !== false;
+      const levels = document.getElementById("tocLevelsSelect");
+      levels.innerHTML = "";
+      for (let i = 1; i <= 9; i++) {
+        const opt = document.createElement("option");
+        opt.value = String(i);
+        opt.textContent = `1-${i}`;
+        if (Number(cfg.levels || 4) === i) opt.selected = true;
+        levels.appendChild(opt);
+      }
+      document.getElementById("tocLeaderSelect").value = cfg.tab_leader || "none";
+      document.getElementById("tocRightTabInput").value = cfg.right_tab_cm || 0;
+
+      const body = document.getElementById("tocStylesBody");
+      body.innerHTML = "";
+      for (let i = 1; i <= 9; i++) {
+        const sid = `TOC${i}`;
+        const s = cfg.styles[sid] || {};
+        const row = document.createElement("div");
+        row.className = "toc-style-grid toc-style-row";
+        row.innerHTML = `
+          <b>${sid}</b>
+          <input type="text" data-toc-style="${sid}" data-key="font" value="${escapeHtml(s.font || "Times New Roman")}">
+          <input type="number" step="0.5" data-toc-style="${sid}" data-key="size_pt" value="${escapeHtml(s.size_pt || 13)}">
+          <input type="checkbox" data-toc-style="${sid}" data-key="bold" ${s.bold ? "checked" : ""}>
+          <input type="number" step="0.05" data-toc-style="${sid}" data-key="left_indent_cm" value="${escapeHtml(s.left_indent_cm ?? 0)}">
+          <input type="number" step="0.05" data-toc-style="${sid}" data-key="text_tab_cm" value="${escapeHtml(s.text_tab_cm ?? 0)}">
+          <input type="number" step="0.5" data-toc-style="${sid}" data-key="space_before_pt" value="${escapeHtml(s.space_before_pt ?? 0)}">
+          <input type="number" step="0.5" data-toc-style="${sid}" data-key="space_after_pt" value="${escapeHtml(s.space_after_pt ?? 0)}">
+          <input type="text" data-toc-style="${sid}" data-key="line_spacing" value="${escapeHtml(s.line_spacing || "1.15")}">
+        `;
+        body.appendChild(row);
+      }
+    }
+
     function renderHeaderFooter() {
       const wrap = document.getElementById("headerFooterFields");
       wrap.innerHTML = "";
@@ -555,12 +1304,17 @@
       }
     }
 
-    function syncHeadingStateFromTable() {
+    function syncHeadingStateFromTable(markChanged = true) {
       document.querySelectorAll("#headingListBody tr").forEach((tr) => {
         const i = Number(tr.dataset.idx);
         if (!headingsState[i]) return;
-        headingsState[i].level = Number(tr.querySelector("[data-h-level]").value || 1);
-        headingsState[i].text = tr.querySelector("[data-h-text]").value || "";
+        const nextLevel = Number(tr.querySelector("[data-h-level]").value || 1);
+        const nextText = tr.querySelector("[data-h-text]").value || "";
+        if (markChanged && (Number(headingsState[i].level || 1) !== nextLevel || String(headingsState[i].text || "") !== nextText)) {
+          markHeadingDirty(i);
+        }
+        headingsState[i].level = nextLevel;
+        headingsState[i].text = nextText;
       });
     }
 
@@ -588,9 +1342,10 @@
       const body = document.getElementById("headingActionsBody");
       body.innerHTML = "";
       headingsState.forEach((h, i) => {
-        const indent = "&nbsp;".repeat(Math.max(0, h.level - 1) * 4);
         const actionClass = h.action === "insert" ? "insert" : h.action === "empty" ? "empty" : "";
+        const indentPx = Math.max(0, Number(h.level || 1) - 1) * 14;
         const tr = document.createElement("tr");
+        if (i === selectedExcelHeading) tr.className = "selected-excel-heading";
         tr.innerHTML = `
           <td>
             <select onchange="setHeadingAction(${i}, this.value)">
@@ -599,7 +1354,14 @@
               <option value="insert" ${h.action === "insert" ? "selected" : ""}>insert Excel</option>
             </select>
           </td>
-          <td>${indent}<span class="pill ${actionClass}">${h.action}</span> H${h.level} · ${escapeHtml(h.text)}</td>
+          <td>
+            <div class="heading-action-cell">
+              <span class="pill ${actionClass}">${h.action}</span>
+              <span class="heading-action-text" style="padding-left:${indentPx}px">
+                H${h.level} · ${escapeHtml(h.text)}
+              </span>
+            </div>
+          </td>
           <td><button type="button" class="light" onclick="selectExcelHeading(${i})">Cấu hình</button></td>
         `;
         body.appendChild(tr);
@@ -614,7 +1376,9 @@
         original_idx: null,
         action: "empty",
         auto_number: document.getElementById("autoNumberCheck").checked,
-        insert_selection: defaultSelection()
+        insert_selection: nullSelectionTemplate(),
+        _dirty: true,
+        _setupRaw: null
       });
       renderHeadingList();
       renderHeadingActions();
@@ -629,12 +1393,49 @@
       renderExcelConfig();
     }
 
+    function headingBlockEnd(start) {
+      const baseLevel = Number(headingsState[start]?.level || 1);
+      let end = start + 1;
+      while (end < headingsState.length && Number(headingsState[end].level || 1) > baseLevel) {
+        end += 1;
+      }
+      return end;
+    }
+
+    function previousSiblingBlockStart(start) {
+      const baseLevel = Number(headingsState[start]?.level || 1);
+      let j = start - 1;
+      while (j >= 0 && Number(headingsState[j].level || 1) > baseLevel) {
+        j -= 1;
+      }
+      if (j < 0 || Number(headingsState[j].level || 1) < baseLevel) return -1;
+      return j;
+    }
+
     function moveHeading(i, dir) {
       syncHeadingStateFromTable();
-      const j = i + dir;
-      if (j < 0 || j >= headingsState.length) return;
-      [headingsState[i], headingsState[j]] = [headingsState[j], headingsState[i]];
-      selectedExcelHeading = j;
+      const blockEnd = headingBlockEnd(i);
+      const block = headingsState.slice(i, blockEnd);
+      let newIndex = i;
+      if (dir < 0) {
+        const prevStart = previousSiblingBlockStart(i);
+        if (prevStart < 0) return;
+        headingsState.splice(i, block.length);
+        headingsState.splice(prevStart, 0, ...block);
+        newIndex = prevStart;
+      } else {
+        if (blockEnd >= headingsState.length) return;
+        const nextLevel = Number(headingsState[blockEnd].level || 1);
+        const baseLevel = Number(headingsState[i].level || 1);
+        if (nextLevel < baseLevel) return;
+        const nextEnd = headingBlockEnd(blockEnd);
+        headingsState.splice(i, block.length);
+        const insertAt = nextEnd - block.length;
+        headingsState.splice(insertAt, 0, ...block);
+        newIndex = insertAt;
+      }
+      selectedExcelHeading = newIndex;
+      block.forEach(h => h._dirty = true);
       renderHeadingList();
       renderHeadingActions();
       renderExcelConfig();
@@ -642,20 +1443,31 @@
 
     function syncHeadingAutoNumber() {
       const checked = document.getElementById("autoNumberCheck").checked;
-      headingsState.forEach(h => h.auto_number = checked);
+      headingsState.forEach((h, i) => {
+        if (h.auto_number !== checked) markHeadingDirty(i);
+        h.auto_number = checked;
+      });
     }
 
     function setAllActions(action) {
-      headingsState.forEach(h => h.action = action);
+      headingsState.forEach(h => {
+        h.action = action;
+        if (action !== "insert") h.insert_selection = nullSelectionTemplate();
+        else if (!selectionHasConfig(h.insert_selection)) h.insert_selection = defaultSelection();
+        h._dirty = true;
+      });
       renderHeadingActions();
       renderExcelConfig();
     }
 
     function setHeadingAction(i, action) {
       headingsState[i].action = action;
+      markHeadingDirty(i);
       if (action === "insert") {
-        if (!headingsState[i].insert_selection) headingsState[i].insert_selection = defaultSelection();
+        if (!selectionHasConfig(headingsState[i].insert_selection)) headingsState[i].insert_selection = defaultSelection();
         selectedExcelHeading = i;
+      } else {
+        headingsState[i].insert_selection = nullSelectionTemplate();
       }
       renderHeadingActions();
       renderExcelConfig();
@@ -665,103 +1477,1065 @@
       if (!headingsState[i]) return;
       if (headingsState[i].action !== "insert") {
         headingsState[i].action = "insert";
+        markHeadingDirty(i);
       }
-      if (!headingsState[i].insert_selection) {
+      if (!selectionHasConfig(headingsState[i].insert_selection)) {
         headingsState[i].insert_selection = defaultSelection();
+        markHeadingDirty(i);
       }
       selectedExcelHeading = i;
       renderHeadingActions();
       renderExcelConfig();
     }
 
+    async function uploadAdditionalExcelFiles(input) {
+      const files = [...(input.files || [])];
+      const status = document.getElementById("excelUploadStatus");
+      if (!files.length) return;
+      const formData = new FormData();
+      for (const file of files) formData.append("excel_file", file);
+      status.textContent = "Đang thêm Excel...";
+      try {
+        const response = await fetch(`/sessions/{{ session_id }}/excel-files`, {
+          method: "POST",
+          body: formData
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Không thêm được file Excel.");
+        excelFiles = payload.excel_files || [];
+        sheets = payload.sheets || [];
+        for (const h of headingsState) {
+          if (h.action === "insert" && h.insert_selection) {
+            h.insert_selection = remapSetupFileId(h.insert_selection);
+          } else if (h.action !== "insert") {
+            h.insert_selection = nullSelectionTemplate();
+          }
+        }
+        refreshDocInfo();
+        renderHeadingActions();
+        renderExcelConfig();
+        status.textContent = `Đã thêm ${files.length} file.`;
+      } catch (err) {
+        status.textContent = "";
+        alert(err.message || err);
+      } finally {
+        input.value = "";
+      }
+    }
+
     function renderExcelConfig() {
       const title = document.getElementById("excelConfigTitle");
       const h = headingsState[selectedExcelHeading];
+      const fileSelect = document.getElementById("excelFileSelect");
+      const sheetSelect = document.getElementById("excelSheetSelect");
+      fileSelect.innerHTML = "";
+      for (const f of excelFiles) {
+        const opt = document.createElement("option");
+        opt.value = f.id;
+        opt.textContent = f.name;
+        fileSelect.appendChild(opt);
+      }
       if (!h || h.action !== "insert") {
+        if (h) h.insert_selection = nullSelectionTemplate();
         title.textContent = "Cấu hình Excel";
-        const sheetSelect = document.getElementById("excelSheetSelect");
         sheetSelect.innerHTML = "";
-        for (const s of sheets) {
+        for (const s of sheetsForFile()) {
           const opt = document.createElement("option");
           opt.value = s.name;
-          opt.textContent = s.name;
+          opt.textContent = s.display_name || s.name;
           sheetSelect.appendChild(opt);
         }
         document.getElementById("columnList").innerHTML = `<div class="muted" style="padding:10px">Chọn action insert Excel cho một heading.</div>`;
         document.getElementById("columnsPreview").textContent = "(chưa chọn)";
+        document.getElementById("advancedPreview").textContent = "";
         return;
       }
-      h.insert_selection = h.insert_selection || defaultSelection();
+      if (!selectionHasConfig(h.insert_selection)) h.insert_selection = defaultSelection();
+      ensureAdvancedSettings(h.insert_selection);
+      if (!h.insert_selection.file_id) h.insert_selection.file_id = (excelFiles[0] && excelFiles[0].id) || (sheets[0] && sheets[0].file_id) || "";
       title.textContent = `Cấu hình Excel: H${h.level} · ${h.text}`;
 
-      const sheetSelect = document.getElementById("excelSheetSelect");
+      for (const opt of fileSelect.options) {
+        opt.selected = opt.value === h.insert_selection.file_id;
+      }
       sheetSelect.innerHTML = "";
-      for (const s of sheets) {
+      for (const s of sheetsForFile(h.insert_selection.file_id)) {
         const opt = document.createElement("option");
         opt.value = s.name;
         opt.textContent = s.name;
         if (s.name === h.insert_selection.sheet) opt.selected = true;
         sheetSelect.appendChild(opt);
       }
-      if (!h.insert_selection.sheet && sheets[0]) h.insert_selection.sheet = sheets[0].name;
-      document.getElementById("rowStartInput").value = h.insert_selection.row_start || sheetByName(h.insert_selection.sheet).header_row || 1;
+      const hasSelectedSheet = [...sheetSelect.options].some(opt => opt.value === h.insert_selection.sheet);
+      if ((!h.insert_selection.sheet || !hasSelectedSheet) && sheetSelect.options[0]) h.insert_selection.sheet = sheetSelect.options[0].value;
+      const sheet = sheetByName(h.insert_selection.file_id, h.insert_selection.sheet);
+      document.getElementById("rowStartInput").value = h.insert_selection.row_start || sheet.header_row || 1;
       document.getElementById("rowEndInput").value = h.insert_selection.row_end || "";
       renderColumnChecks();
+      renderAdvancedPreview();
     }
 
     function renderColumnChecks() {
       const h = headingsState[selectedExcelHeading];
       const list = document.getElementById("columnList");
       if (!h || h.action !== "insert") return;
-      const sheet = sheetByName(h.insert_selection.sheet);
-      const selected = new Set(indexesFromSpec(h.insert_selection.columns));
+      const sheet = sheetByName(h.insert_selection.file_id, h.insert_selection.sheet);
+      const selectedOrder = indexesFromSpec(h.insert_selection.columns);
+      const selected = new Set(selectedOrder.map(Number));
+      const headerOverrides = h.insert_selection.header_overrides || {};
       list.innerHTML = "";
+      const header = document.createElement("div");
+      header.className = "column-config-row muted";
+      header.innerHTML = `<span></span><b>Cột</b><b>Header Excel</b><b>Header đích</b><b>Thứ tự</b>`;
+      list.appendChild(header);
       for (const col of sheet.columns || []) {
-        const row = document.createElement("label");
-        row.className = "check-row";
+        const checked = selected.has(Number(col.index));
+        const orderPos = selectedOrder.map(Number).indexOf(Number(col.index));
+        const row = document.createElement("div");
+        row.className = "column-config-row";
         row.innerHTML = `
-          <input type="checkbox" class="col-check" value="${col.index}" ${selected.has(Number(col.index)) ? "checked" : ""} onchange="updateSelectedExcelConfig()">
+          <input type="checkbox" class="col-check" value="${col.index}" ${checked ? "checked" : ""} onchange="toggleColumnSelection(${col.index}, this.checked)">
           <b>${col.letter}</b>
           <span>${escapeHtml(col.header)}</span>
+          <input type="text" class="col-header-rename" data-col-index="${col.index}" value="${escapeHtml(headerOverrides[col.index] ?? col.header ?? "")}" ${checked ? "" : "disabled"} onchange="updateSelectedExcelConfig()">
+          <span class="column-move">
+            <button type="button" class="light" ${checked && orderPos > 0 ? "" : "disabled"} onclick="moveSelectedColumn(${col.index}, -1)">↑</button>
+            <button type="button" class="light" ${checked && orderPos >= 0 && orderPos < selectedOrder.length - 1 ? "" : "disabled"} onclick="moveSelectedColumn(${col.index}, 1)">↓</button>
+          </span>
         `;
         list.appendChild(row);
       }
       document.getElementById("columnsPreview").textContent = h.insert_selection.columns || "(chưa chọn)";
     }
 
+    function currentSelectedColumnOrder() {
+      const h = headingsState[selectedExcelHeading];
+      const existing = indexesFromSpec(h && h.insert_selection ? h.insert_selection.columns : "");
+      const checked = new Set([...document.querySelectorAll(".col-check:checked")].map(c => Number(c.value)));
+      const ordered = existing.filter(c => checked.has(Number(c)));
+      for (const c of checked) {
+        if (!ordered.includes(c)) ordered.push(c);
+      }
+      return ordered;
+    }
+
+    function toggleColumnSelection(colIndex, checked) {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") return;
+      markHeadingDirty(selectedExcelHeading);
+      const current = indexesFromSpec(h.insert_selection.columns).map(Number);
+      if (checked && !current.includes(Number(colIndex))) current.push(Number(colIndex));
+      const next = checked ? current : current.filter(c => c !== Number(colIndex));
+      h.insert_selection.columns = colSpecFromOrderedIndexes(next);
+      updateSelectedExcelConfig(false);
+      renderColumnChecks();
+    }
+
+    function moveSelectedColumn(colIndex, dir) {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") return;
+      const ordered = currentSelectedColumnOrder().map(Number);
+      const from = ordered.indexOf(Number(colIndex));
+      const to = from + dir;
+      if (from < 0 || to < 0 || to >= ordered.length) return;
+      [ordered[from], ordered[to]] = [ordered[to], ordered[from]];
+      markHeadingDirty(selectedExcelHeading);
+      h.insert_selection.columns = colSpecFromOrderedIndexes(ordered);
+      updateSelectedExcelConfig(false);
+      renderColumnChecks();
+    }
+
     function changeExcelSheet() {
       const h = headingsState[selectedExcelHeading];
       if (!h) return;
+      const fileId = document.getElementById("excelFileSelect").value;
       const sheetName = document.getElementById("excelSheetSelect").value;
-      h.insert_selection = defaultSelection(sheetName);
+      markHeadingDirty(selectedExcelHeading);
+      h.insert_selection = defaultSelection(fileId, sheetName);
       renderExcelConfig();
     }
 
-    function updateSelectedExcelConfig() {
+    function changeExcelFile() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h) return;
+      const fileId = document.getElementById("excelFileSelect").value;
+      markHeadingDirty(selectedExcelHeading);
+      h.insert_selection = defaultSelection(fileId);
+      renderExcelConfig();
+    }
+
+    function updateSelectedExcelConfig(refreshColumns = false, markChanged = true) {
       const h = headingsState[selectedExcelHeading];
       if (!h || h.action !== "insert") return;
-      const checked = [...document.querySelectorAll(".col-check:checked")].map(c => c.value);
+      const before = JSON.stringify(h.insert_selection || {});
+      const checked = currentSelectedColumnOrder();
+      const headerOverrides = {};
+      document.querySelectorAll(".col-header-rename").forEach(inp => {
+        if (!inp.disabled) headerOverrides[inp.dataset.colIndex] = inp.value;
+      });
       h.insert_selection.mode = "custom";
+      h.insert_selection.file_id = document.getElementById("excelFileSelect").value;
       h.insert_selection.sheet = document.getElementById("excelSheetSelect").value;
-      h.insert_selection.columns = colSpecFromIndexes(checked);
+      h.insert_selection.columns = colSpecFromOrderedIndexes(checked);
+      h.insert_selection.header_overrides = headerOverrides;
       h.insert_selection.row_start = Number(document.getElementById("rowStartInput").value || 1);
       h.insert_selection.row_end = document.getElementById("rowEndInput").value.trim() || null;
+      pruneAdvancedMergeColumns(h.insert_selection);
+      if (markChanged && before !== JSON.stringify(h.insert_selection || {})) markHeadingDirty(selectedExcelHeading);
       document.getElementById("columnsPreview").textContent = h.insert_selection.columns || "(chưa chọn)";
+      renderAdvancedPreview();
+      if (refreshColumns) renderColumnChecks();
     }
 
     function selectFirstColumns(count) {
-      document.querySelectorAll(".col-check").forEach((c, i) => c.checked = i < count);
-      updateSelectedExcelConfig();
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") return;
+      markHeadingDirty(selectedExcelHeading);
+      const sheet = sheetByName(h.insert_selection.file_id, h.insert_selection.sheet);
+      h.insert_selection.columns = colSpecFromOrderedIndexes((sheet.columns || []).slice(0, count).map(c => c.index));
+      pruneAdvancedMergeColumns(h.insert_selection);
+      renderColumnChecks();
+      renderAdvancedPreview();
     }
 
     function selectAllColumns() {
-      document.querySelectorAll(".col-check").forEach(c => c.checked = true);
-      updateSelectedExcelConfig();
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") return;
+      markHeadingDirty(selectedExcelHeading);
+      const sheet = sheetByName(h.insert_selection.file_id, h.insert_selection.sheet);
+      h.insert_selection.columns = colSpecFromOrderedIndexes((sheet.columns || []).map(c => c.index));
+      pruneAdvancedMergeColumns(h.insert_selection);
+      renderColumnChecks();
+      renderAdvancedPreview();
     }
 
     function clearColumns() {
-      document.querySelectorAll(".col-check").forEach(c => c.checked = false);
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") return;
+      markHeadingDirty(selectedExcelHeading);
+      h.insert_selection.columns = "";
+      h.insert_selection.header_overrides = {};
+      pruneAdvancedMergeColumns(h.insert_selection);
+      renderColumnChecks();
+      renderAdvancedPreview();
+    }
+
+    function selectedExcelSheet() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return sheetByName("", "");
+      return sheetByName(h.insert_selection.file_id, h.insert_selection.sheet);
+    }
+
+    function columnLabel(colIndex) {
+      const sheet = selectedExcelSheet();
+      const col = (sheet.columns || []).find(c => Number(c.index) === Number(colIndex));
+      return col ? `${col.letter} · ${col.header}` : String(colIndex || "");
+    }
+
+    function columnLabelFor(fileId, sheetName, colIndex) {
+      const sheet = sheetByName(fileId, sheetName);
+      const col = (sheet.columns || []).find(c => Number(c.index) === Number(colIndex));
+      return col ? `${col.letter} · ${col.header}` : String(colIndex || "");
+    }
+
+    function advancedSourceBaseState() {
+      const h = headingsState[selectedExcelHeading];
+      const selection = h && h.insert_selection ? h.insert_selection : defaultSelection();
+      const adv = ensureAdvancedSettings(selection);
+      const draft = adv.split_source_draft && typeof adv.split_source_draft === "object"
+        ? adv.split_source_draft
+        : null;
+      if (draft) {
+        return {
+          file_id: draft.file_id || selection.file_id || (excelFiles[0] && excelFiles[0].id) || "",
+          sheet: draft.sheet || selection.sheet || "",
+          columns: draft.columns || selection.columns || "",
+          row_start: draft.row_start || selection.row_start || 1,
+          row_end: draft.row_end || selection.row_end || "",
+          split_column: draft.split_column || adv.split_column || ""
+        };
+      }
+      const fallbackFile = (excelFiles.find(f => f.id !== selection.file_id) || excelFiles[0] || {}).id || "";
+      const fallbackSheet = (sheetsForFile(fallbackFile)[0] || {}).name || selection.sheet || "";
+      return {
+        file_id: fallbackFile || selection.file_id || "",
+        sheet: fallbackSheet,
+        columns: "",
+        row_start: selection.row_start || 1,
+        row_end: selection.row_end || "",
+        split_column: adv.split_column || ""
+      };
+    }
+
+    function currentAdvancedSourceState() {
+      const fileSelect = document.getElementById("advSourceFileSelect");
+      const sheetSelect = document.getElementById("advSourceSheetSelect");
+      const rowStart = document.getElementById("advSourceRowStart");
+      const rowEnd = document.getElementById("advSourceRowEnd");
+      const splitColumn = document.getElementById("advSourceSplitColumn");
+      const checked = [...document.querySelectorAll(".adv-source-col-check:checked")].map(inp => Number(inp.value));
+      return {
+        file_id: fileSelect ? fileSelect.value : "",
+        sheet: sheetSelect ? sheetSelect.value : "",
+        columns: colSpecFromOrderedIndexes(checked),
+        row_start: rowStart ? Number(rowStart.value || 1) : 1,
+        row_end: rowEnd ? rowEnd.value.trim() : "",
+        split_column: splitColumn ? splitColumn.value : ""
+      };
+    }
+
+    function rememberAdvancedSourceDraft(state = null) {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return;
+      markHeadingDirty(selectedExcelHeading);
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      const source = state || currentAdvancedSourceState();
+      adv.split_source_draft = {
+        file_id: source.file_id || "",
+        file_name: excelFileName(source.file_id),
+        source_path: excelFilePath(source.file_id),
+        sheet: source.sheet || "",
+        columns: source.columns || "",
+        row_start: source.row_start || 1,
+        row_end: source.row_end || "",
+        split_column: source.split_column || ""
+      };
+    }
+
+    function renderAdvancedSourcePicker(state = null) {
+      const fileSelect = document.getElementById("advSourceFileSelect");
+      const sheetSelect = document.getElementById("advSourceSheetSelect");
+      const columnsBox = document.getElementById("advSourceColumnsBox");
+      const rowStart = document.getElementById("advSourceRowStart");
+      const rowEnd = document.getElementById("advSourceRowEnd");
+      const splitColumn = document.getElementById("advSourceSplitColumn");
+      if (!fileSelect || !sheetSelect || !columnsBox || !rowStart || !rowEnd || !splitColumn) return;
+
+      const base = {...advancedSourceBaseState(), ...(state || {})};
+      let fileId = base.file_id || (excelFiles[0] && excelFiles[0].id) || "";
+      fileSelect.innerHTML = "";
+      for (const f of excelFiles) {
+        const opt = document.createElement("option");
+        opt.value = f.id;
+        opt.textContent = f.name || f.id;
+        opt.selected = f.id === fileId;
+        fileSelect.appendChild(opt);
+      }
+      if (!fileSelect.options.length && fileId) {
+        const opt = document.createElement("option");
+        opt.value = fileId;
+        opt.textContent = fileId;
+        fileSelect.appendChild(opt);
+      }
+      if (!fileSelect.value && fileSelect.options.length) fileId = fileSelect.options[0].value;
+      else fileId = fileSelect.value || fileId;
+
+      const fileSheets = sheetsForFile(fileId);
+      let sheetName = base.sheet && fileSheets.some(s => s.name === base.sheet)
+        ? base.sheet
+        : (fileSheets[0] && fileSheets[0].name) || "";
+      sheetSelect.innerHTML = "";
+      for (const s of fileSheets) {
+        const opt = document.createElement("option");
+        opt.value = s.name;
+        opt.textContent = s.name;
+        opt.selected = s.name === sheetName;
+        sheetSelect.appendChild(opt);
+      }
+      if (!sheetSelect.value && sheetSelect.options.length) sheetName = sheetSelect.options[0].value;
+      else sheetName = sheetSelect.value || sheetName;
+
+      const sheet = sheetByName(fileId, sheetName);
+      const defaultColumnSpec = colSpecFromIndexes((sheet.columns || []).slice(0, 7).map(c => c.index));
+      const hasExplicitColumns = Boolean(state && Object.prototype.hasOwnProperty.call(state, "columns"));
+      const selectedSpec = hasExplicitColumns ? base.columns : (base.columns || defaultColumnSpec);
+      const selected = new Set(indexesFromSpec(selectedSpec).map(Number));
+      rowStart.value = base.row_start || sheet.header_row || 1;
+      rowEnd.value = base.row_end || "";
+
+      splitColumn.innerHTML = "";
+      for (const col of sheet.columns || []) {
+        const opt = document.createElement("option");
+        opt.value = col.index;
+        opt.textContent = `${col.letter} · ${col.header}`;
+        opt.selected = Number(col.index) === Number(base.split_column);
+        splitColumn.appendChild(opt);
+      }
+      if (!splitColumn.value && splitColumn.options.length) splitColumn.options[0].selected = true;
+      splitColumn.onchange = () => rememberAdvancedSourceDraft();
+      rowStart.onchange = () => rememberAdvancedSourceDraft();
+      rowEnd.onchange = () => rememberAdvancedSourceDraft();
+
+      columnsBox.innerHTML = "";
+      for (const col of sheet.columns || []) {
+        const row = document.createElement("label");
+        row.className = "check-row";
+        row.innerHTML = `
+          <input type="checkbox" class="adv-source-col-check" value="${col.index}" onchange="rememberAdvancedSourceDraft()" ${selected.has(Number(col.index)) ? "checked" : ""}>
+          <b>${col.letter}</b>
+          <span>${escapeHtml(col.header)}</span>
+        `;
+        columnsBox.appendChild(row);
+      }
+      if (!(sheet.columns || []).length) {
+        columnsBox.innerHTML = `<div class="muted" style="padding:8px">Sheet này chưa có danh sách cột.</div>`;
+      }
+    }
+
+    function changeAdvancedSourceFile() {
+      const fileId = document.getElementById("advSourceFileSelect").value;
+      const firstSheet = (sheetsForFile(fileId)[0] || {}).name || "";
+      renderAdvancedSourcePicker({file_id: fileId, sheet: firstSheet});
+      rememberAdvancedSourceDraft();
+    }
+
+    function changeAdvancedSourceSheet() {
+      const state = currentAdvancedSourceState();
+      const {columns, ...nextState} = state;
+      renderAdvancedSourcePicker(nextState);
+      rememberAdvancedSourceDraft();
+    }
+
+    function setAdvancedSourceColumns(mode) {
+      const state = currentAdvancedSourceState();
+      const sheet = sheetByName(state.file_id, state.sheet);
+      let indexes = [];
+      if (mode === "first7") indexes = (sheet.columns || []).slice(0, 7).map(c => c.index);
+      else if (mode === "all") indexes = (sheet.columns || []).map(c => c.index);
+      renderAdvancedSourcePicker({...state, columns: colSpecFromOrderedIndexes(indexes)});
+      rememberAdvancedSourceDraft();
+    }
+
+    function renderAdvancedTextRulePicker(state = null) {
+      const h = headingsState[selectedExcelHeading];
+      const selection = h && h.insert_selection ? h.insert_selection : defaultSelection();
+      const fileSelect = document.getElementById("advTextRuleFile");
+      const sheetSelect = document.getElementById("advTextRuleSheet");
+      const keySelect = document.getElementById("advTextRuleKeyColumn");
+      const valueSelect = document.getElementById("advTextRuleValueColumn");
+      if (!fileSelect || !sheetSelect || !keySelect || !valueSelect) return;
+      const base = {
+        file_id: selection.file_id || (excelFiles[0] && excelFiles[0].id) || "",
+        sheet: selection.sheet || "",
+        key_column: "",
+        value_column: "",
+        ...(state || {})
+      };
+      fileSelect.innerHTML = "";
+      for (const f of excelFiles) {
+        const opt = document.createElement("option");
+        opt.value = f.id;
+        opt.textContent = f.name || f.id;
+        opt.selected = f.id === base.file_id;
+        fileSelect.appendChild(opt);
+      }
+      const fileId = fileSelect.value || base.file_id;
+      const fileSheets = sheetsForFile(fileId);
+      const sheetName = base.sheet && fileSheets.some(s => s.name === base.sheet)
+        ? base.sheet
+        : (fileSheets[0] && fileSheets[0].name) || "";
+      sheetSelect.innerHTML = "";
+      for (const s of fileSheets) {
+        const opt = document.createElement("option");
+        opt.value = s.name;
+        opt.textContent = s.name;
+        opt.selected = s.name === sheetName;
+        sheetSelect.appendChild(opt);
+      }
+      const sheet = sheetByName(fileId, sheetSelect.value || sheetName);
+      for (const select of [keySelect, valueSelect]) select.innerHTML = "";
+      for (const col of sheet.columns || []) {
+        for (const [select, selectedValue] of [[keySelect, base.key_column], [valueSelect, base.value_column]]) {
+          const opt = document.createElement("option");
+          opt.value = col.index;
+          opt.textContent = `${col.letter} · ${col.header}`;
+          opt.selected = Number(col.index) === Number(selectedValue);
+          select.appendChild(opt);
+        }
+      }
+    }
+
+    function changeAdvancedTextRuleFile() {
+      const fileId = document.getElementById("advTextRuleFile").value;
+      const firstSheet = (sheetsForFile(fileId)[0] || {}).name || "";
+      renderAdvancedTextRulePicker({file_id: fileId, sheet: firstSheet});
+    }
+
+    function changeAdvancedTextRuleSheet() {
+      renderAdvancedTextRulePicker({
+        file_id: document.getElementById("advTextRuleFile").value,
+        sheet: document.getElementById("advTextRuleSheet").value
+      });
+    }
+
+    function renderAdvancedTextRules() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return;
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      const list = document.getElementById("advTextRulesList");
+      if (!list) return;
+      list.innerHTML = "";
+      (adv.split_text_rules || []).forEach((rule, idx) => {
+        const row = document.createElement("div");
+        row.className = "merge-column-row";
+        row.innerHTML = `
+          <span>
+            <b>${escapeHtml(rule.prefix || "(không có text đầu)")}</b>
+            ${escapeHtml(excelFileName(rule.file_id) || rule.file_id || "")} / ${escapeHtml(rule.sheet || "")}
+            · khớp ${escapeHtml(columnLabelFor(rule.file_id, rule.sheet, rule.key_column))}
+            → lấy ${escapeHtml(columnLabelFor(rule.file_id, rule.sheet, rule.value_column))}
+            ${rule.force_left === false ? " · không ép căn trái" : " · căn trái"}
+          </span>
+          <button type="button" class="light" onclick="removeAdvancedTextRule(${idx})">Xóa</button>
+        `;
+        list.appendChild(row);
+      });
+      if (!(adv.split_text_rules || []).length) {
+        list.innerHTML = `<div class="muted" style="padding:8px">Chưa thêm đoạn văn bản.</div>`;
+      }
+    }
+
+    function addAdvancedTextRule() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return;
+      markHeadingDirty(selectedExcelHeading);
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      const fileId = document.getElementById("advTextRuleFile").value;
+      const rule = {
+        enabled: true,
+        file_id: fileId,
+        file_name: excelFileName(fileId),
+        source_path: excelFilePath(fileId),
+        sheet: document.getElementById("advTextRuleSheet").value,
+        key_column: document.getElementById("advTextRuleKeyColumn").value,
+        value_column: document.getElementById("advTextRuleValueColumn").value,
+        prefix: document.getElementById("advTextRulePrefix").value,
+        prefix_bold: document.getElementById("advTextRulePrefixBold").checked,
+        prefix_italic: document.getElementById("advTextRulePrefixItalic").checked,
+        prefix_underline: document.getElementById("advTextRulePrefixUnderline").checked,
+        force_left: document.getElementById("advTextRuleForceLeft").checked,
+        row_start: Number(document.getElementById("advTextRuleRowStart").value || 1),
+        row_end: document.getElementById("advTextRuleRowEnd").value.trim() || null
+      };
+      if (!rule.file_id || !rule.sheet || !rule.key_column || !rule.value_column) {
+        alert("Vui lòng chọn file, sheet, cột so khớp và cột lấy nội dung.");
+        return;
+      }
+      adv.split_text_rules = adv.split_text_rules || [];
+      adv.split_text_rules.push(rule);
+      renderAdvancedTextRules();
+      renderAdvancedPreview();
+    }
+
+    function removeAdvancedTextRule(index) {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return;
+      markHeadingDirty(selectedExcelHeading);
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      adv.split_text_rules = (adv.split_text_rules || []).filter((_rule, idx) => idx !== Number(index));
+      renderAdvancedTextRules();
+      renderAdvancedPreview();
+    }
+
+    function renderAdvancedPreview() {
+      const preview = document.getElementById("advancedPreview");
+      const h = headingsState[selectedExcelHeading];
+      if (!preview || !h || h.action !== "insert" || !h.insert_selection) {
+        if (preview) preview.textContent = "";
+        return;
+      }
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      const parts = [];
+      if (adv.split_enabled && adv.split_column) {
+        parts.push(`Tách theo ${columnLabel(adv.split_column)}`);
+      }
+      if ((adv.merge_columns || []).length) {
+        parts.push(`Merge ${adv.merge_columns.length} cột`);
+      }
+      if (adv.auto_stt_enabled) parts.push("Thêm STT");
+      if (adv.internal_link_enabled) parts.push("Hyperlink nội bộ");
+      if ((adv.split_sources || []).length) parts.push(`${adv.split_sources.length + 1} nguồn`);
+      if ((adv.split_text_rules || []).length) parts.push(`${adv.split_text_rules.length} đoạn lookup`);
+      preview.textContent = parts.join(" · ");
+    }
+
+    function pruneAdvancedMergeColumns(selection) {
+      if (!selection) return;
+      const adv = ensureAdvancedSettings(selection);
+      const selectedCols = new Set(indexesFromSpec(selection.columns).map(Number));
+      adv.merge_columns = (adv.merge_columns || []).map(Number).filter(c => selectedCols.has(c));
+    }
+
+    function openAdvancedSettings() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || h.action !== "insert") {
+        alert("Chọn một heading có action insert Excel trước.");
+        return;
+      }
       updateSelectedExcelConfig();
+      renderAdvancedDialog();
+      const modal = document.getElementById("advancedModal");
+      modal.classList.add("active");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeAdvancedSettings() {
+      const modal = document.getElementById("advancedModal");
+      modal.classList.remove("active");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    function renderAdvancedDialog() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return;
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      const sheet = selectedExcelSheet();
+      const splitEnabled = document.getElementById("advSplitEnabled");
+      const splitColumn = document.getElementById("advSplitColumn");
+      const addHeading = document.getElementById("advAddHeading");
+      const prefix = document.getElementById("advHeadingPrefix");
+      const suffix = document.getElementById("advHeadingSuffix");
+      const headingFont = document.getElementById("advHeadingFont");
+      const headingSize = document.getElementById("advHeadingSize");
+      const headingColor = document.getElementById("advHeadingColor");
+      const headingBold = document.getElementById("advHeadingBold");
+      const headingItalic = document.getElementById("advHeadingItalic");
+      const headingUnderline = document.getElementById("advHeadingUnderline");
+      const autoStt = document.getElementById("advAutoStt");
+      const internalLink = document.getElementById("advInternalLink");
+      const internalLinkColumn = document.getElementById("advInternalLinkColumn");
+      const internalLinkTarget = document.getElementById("advInternalLinkTarget");
+      const multiSourceMode = document.getElementById("advMultiSourceMode");
+      const groupHeading = document.getElementById("advInterleaveGroupHeading");
+      const groupPrefix = document.getElementById("advInterleaveGroupPrefix");
+      const groupSuffix = document.getElementById("advInterleaveGroupSuffix");
+      const splitSourcesList = document.getElementById("advSplitSourcesList");
+      const mergeBox = document.getElementById("advMergeColumns");
+
+      splitEnabled.checked = Boolean(adv.split_enabled);
+      addHeading.checked = Boolean(adv.add_split_heading);
+      prefix.value = adv.heading_prefix ?? "Bảng ";
+      suffix.value = adv.heading_suffix ?? "";
+      headingFont.value = adv.heading_font ?? "";
+      headingSize.value = adv.heading_size_pt ?? "";
+      headingColor.value = adv.heading_color ?? "";
+      headingBold.checked = Boolean(adv.heading_bold);
+      headingItalic.checked = Boolean(adv.heading_italic);
+      headingUnderline.checked = Boolean(adv.heading_underline);
+      autoStt.checked = Boolean(adv.auto_stt_enabled);
+      internalLink.checked = Boolean(adv.internal_link_enabled);
+      multiSourceMode.value = adv.multi_source_mode || "sequential";
+      groupHeading.checked = adv.interleave_group_heading_enabled !== false;
+      groupPrefix.value = adv.interleave_group_heading_prefix ?? "Cụm ";
+      groupSuffix.value = adv.interleave_group_heading_suffix ?? "";
+
+      splitColumn.innerHTML = "";
+      for (const col of sheet.columns || []) {
+        const opt = document.createElement("option");
+        opt.value = col.index;
+        opt.textContent = `${col.letter} · ${col.header}`;
+        opt.selected = Number(col.index) === Number(adv.split_column);
+        splitColumn.appendChild(opt);
+      }
+      if (!adv.split_column && splitColumn.options.length) {
+        splitColumn.options[0].selected = true;
+      }
+      internalLinkColumn.innerHTML = "";
+      for (const col of sheet.columns || []) {
+        const opt = document.createElement("option");
+        opt.value = col.index;
+        opt.textContent = `${col.letter} · ${col.header}`;
+        opt.selected = Number(col.index) === Number(adv.internal_link_column);
+        internalLinkColumn.appendChild(opt);
+      }
+      internalLinkTarget.innerHTML = "";
+      for (const hh of headingsState) {
+        const opt = document.createElement("option");
+        opt.value = hh.original_idx ?? "";
+        opt.textContent = `H${hh.level} · ${hh.text}`;
+        opt.selected = Number(hh.original_idx) === Number(adv.internal_link_target_heading_original_idx);
+        internalLinkTarget.appendChild(opt);
+      }
+      splitColumn.disabled = !splitEnabled.checked;
+      addHeading.disabled = !splitEnabled.checked;
+      prefix.disabled = !splitEnabled.checked || !addHeading.checked;
+      suffix.disabled = !splitEnabled.checked || !addHeading.checked;
+      headingFont.disabled = !splitEnabled.checked || !addHeading.checked;
+      headingSize.disabled = !splitEnabled.checked || !addHeading.checked;
+      headingColor.disabled = !splitEnabled.checked || !addHeading.checked;
+      headingBold.disabled = !splitEnabled.checked || !addHeading.checked;
+      headingItalic.disabled = !splitEnabled.checked || !addHeading.checked;
+      headingUnderline.disabled = !splitEnabled.checked || !addHeading.checked;
+      internalLinkColumn.disabled = !internalLink.checked;
+      internalLinkTarget.disabled = !internalLink.checked;
+      const isInterleave = multiSourceMode.value === "interleave";
+      groupHeading.disabled = !isInterleave;
+      groupPrefix.disabled = !isInterleave || !groupHeading.checked;
+      groupSuffix.disabled = !isInterleave || !groupHeading.checked;
+      renderAdvancedSourcePicker();
+
+      splitSourcesList.innerHTML = "";
+      (adv.split_sources || []).forEach((src, idx) => {
+        const row = document.createElement("div");
+        row.className = "merge-column-row";
+        const rowEndText = src.row_end ? ` đến dòng ${escapeHtml(src.row_end)}` : " đến hết data";
+        const splitText = src.split_column ? columnLabelFor(src.file_id, src.sheet, src.split_column) : "";
+        row.innerHTML = `
+          <span>
+            <b>${escapeHtml(src.file_name || excelFileName(src.file_id) || src.file_id || "")}</b> / ${escapeHtml(src.sheet || "")}
+            · Cột ${escapeHtml(src.columns || "(chưa chọn)")}
+            · Dòng ${escapeHtml(src.row_start || 1)}${rowEndText}
+            ${splitText ? `· Tách theo ${escapeHtml(splitText)}` : ""}
+          </span>
+          <button type="button" class="light" onclick="removeAdvancedSplitSource(${idx})">Xóa</button>
+        `;
+        splitSourcesList.appendChild(row);
+      });
+      if (!(adv.split_sources || []).length) {
+        splitSourcesList.innerHTML = `<div class="muted" style="padding:8px">Chưa thêm nguồn phụ.</div>`;
+      }
+      renderAdvancedTextRulePicker();
+      renderAdvancedTextRules();
+
+      const selectedCols = new Set(indexesFromSpec(h.insert_selection.columns).map(Number));
+      const mergeSet = new Set((adv.merge_columns || []).map(Number));
+      mergeBox.innerHTML = "";
+      for (const col of sheet.columns || []) {
+        const isSelected = selectedCols.has(Number(col.index));
+        const row = document.createElement("label");
+        row.className = "merge-column-row";
+        row.innerHTML = `
+          <input type="checkbox" data-adv-merge="${col.index}" ${mergeSet.has(Number(col.index)) ? "checked" : ""} ${isSelected ? "" : "disabled"}>
+          <b>${col.letter}</b>
+          <span>${escapeHtml(col.header)}${isSelected ? "" : " <span class='muted'>(chưa chọn để chèn)</span>"}</span>
+        `;
+        mergeBox.appendChild(row);
+      }
+    }
+
+    function refreshAdvancedDialogState() {
+      const splitEnabled = document.getElementById("advSplitEnabled");
+      const addHeading = document.getElementById("advAddHeading");
+      document.getElementById("advSplitColumn").disabled = !splitEnabled.checked;
+      addHeading.disabled = !splitEnabled.checked;
+      document.getElementById("advHeadingPrefix").disabled = !splitEnabled.checked || !addHeading.checked;
+      document.getElementById("advHeadingSuffix").disabled = !splitEnabled.checked || !addHeading.checked;
+      document.getElementById("advHeadingFont").disabled = !splitEnabled.checked || !addHeading.checked;
+      document.getElementById("advHeadingSize").disabled = !splitEnabled.checked || !addHeading.checked;
+      document.getElementById("advHeadingColor").disabled = !splitEnabled.checked || !addHeading.checked;
+      document.getElementById("advHeadingBold").disabled = !splitEnabled.checked || !addHeading.checked;
+      document.getElementById("advHeadingItalic").disabled = !splitEnabled.checked || !addHeading.checked;
+      document.getElementById("advHeadingUnderline").disabled = !splitEnabled.checked || !addHeading.checked;
+      const internalLink = document.getElementById("advInternalLink");
+      document.getElementById("advInternalLinkColumn").disabled = !internalLink.checked;
+      document.getElementById("advInternalLinkTarget").disabled = !internalLink.checked;
+      const multiSourceMode = document.getElementById("advMultiSourceMode");
+      const groupHeading = document.getElementById("advInterleaveGroupHeading");
+      const isInterleave = multiSourceMode.value === "interleave";
+      groupHeading.disabled = !isInterleave;
+      document.getElementById("advInterleaveGroupPrefix").disabled = !isInterleave || !groupHeading.checked;
+      document.getElementById("advInterleaveGroupSuffix").disabled = !isInterleave || !groupHeading.checked;
+    }
+
+    function sourceSignature(source) {
+      return [
+        source.file_id || "",
+        source.sheet || "",
+        source.columns || "",
+        source.row_start || 1,
+        source.row_end || "",
+        source.split_column || ""
+      ].join("|");
+    }
+
+    function sourceEntryFromState(source) {
+      return {
+        file_id: source.file_id,
+        file_name: excelFileName(source.file_id),
+        source_path: excelFilePath(source.file_id),
+        sheet: source.sheet,
+        columns: source.columns,
+        row_start: source.row_start || 1,
+        row_end: source.row_end || null,
+        split_column: source.split_column || ""
+      };
+    }
+
+    function isSameAsMainInsertSource(source) {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return false;
+      const main = {
+        file_id: h.insert_selection.file_id || "",
+        sheet: h.insert_selection.sheet || "",
+        columns: h.insert_selection.columns || "",
+        row_start: h.insert_selection.row_start || 1,
+        row_end: h.insert_selection.row_end || "",
+        split_column: (ensureAdvancedSettings(h.insert_selection).split_column || "")
+      };
+      return sourceSignature(source) === sourceSignature(main);
+    }
+
+    function addAdvancedSplitSourceFromState(source, silent = false) {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return false;
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      if (!source.file_id || !source.sheet || !source.columns) {
+        if (!silent) alert("Vui lòng chọn file, sheet và ít nhất một cột cho nguồn phụ.");
+        return false;
+      }
+      const entry = sourceEntryFromState(source);
+      adv.split_sources = adv.split_sources || [];
+      const exists = adv.split_sources.some(src => sourceSignature(src) === sourceSignature(entry));
+      if (exists) return true;
+      if (isSameAsMainInsertSource(entry)) return true;
+      markHeadingDirty(selectedExcelHeading);
+      adv.split_sources.push(entry);
+      adv.split_source_draft = {...entry};
+      return true;
+    }
+
+    function addAdvancedSplitSource() {
+      const source = currentAdvancedSourceState();
+      if (!addAdvancedSplitSourceFromState(source, false)) return;
+      renderAdvancedDialog();
+      renderAdvancedPreview();
+    }
+
+    function removeAdvancedSplitSource(index) {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return;
+      markHeadingDirty(selectedExcelHeading);
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      adv.split_sources = (adv.split_sources || []).filter((_src, i) => i !== Number(index));
+      renderAdvancedDialog();
+      renderAdvancedPreview();
+    }
+
+    function saveAdvancedSettings() {
+      const h = headingsState[selectedExcelHeading];
+      if (!h || !h.insert_selection) return;
+      markHeadingDirty(selectedExcelHeading);
+      const adv = ensureAdvancedSettings(h.insert_selection);
+      adv.split_enabled = document.getElementById("advSplitEnabled").checked;
+      adv.split_column = document.getElementById("advSplitColumn").value || "";
+      adv.add_split_heading = document.getElementById("advAddHeading").checked;
+      adv.heading_prefix = document.getElementById("advHeadingPrefix").value;
+      adv.heading_suffix = document.getElementById("advHeadingSuffix").value;
+      adv.heading_font = document.getElementById("advHeadingFont").value.trim();
+      adv.heading_size_pt = document.getElementById("advHeadingSize").value.trim();
+      adv.heading_color = document.getElementById("advHeadingColor").value.trim().replace(/^#/, "");
+      adv.heading_bold = document.getElementById("advHeadingBold").checked;
+      adv.heading_italic = document.getElementById("advHeadingItalic").checked;
+      adv.heading_underline = document.getElementById("advHeadingUnderline").checked;
+      adv.auto_stt_enabled = document.getElementById("advAutoStt").checked;
+      adv.internal_link_enabled = document.getElementById("advInternalLink").checked;
+      adv.internal_link_column = document.getElementById("advInternalLinkColumn").value || "";
+      adv.internal_link_target_heading_original_idx = document.getElementById("advInternalLinkTarget").value || "";
+      adv.multi_source_mode = document.getElementById("advMultiSourceMode").value || "sequential";
+      adv.interleave_group_heading_enabled = document.getElementById("advInterleaveGroupHeading").checked;
+      adv.interleave_group_heading_prefix = document.getElementById("advInterleaveGroupPrefix").value;
+      adv.interleave_group_heading_suffix = document.getElementById("advInterleaveGroupSuffix").value;
+      if (adv.split_source_draft) {
+        rememberAdvancedSourceDraft();
+        addAdvancedSplitSourceFromState(adv.split_source_draft, true);
+      }
+      adv.merge_columns = [...document.querySelectorAll("[data-adv-merge]:checked")]
+        .map(inp => Number(inp.dataset.advMerge))
+        .filter(Boolean);
+      renderAdvancedPreview();
+      renderSummary();
+      closeAdvancedSettings();
+    }
+
+    function step6SetupPayload() {
+      syncHeadingStateFromTable();
+      updateSelectedExcelConfig(false, false);
+      const payload = importedStep6Payload ? deepClone(importedStep6Payload) : {
+        type: "docx-template-builder-step6-setup",
+        version: 1,
+        exported_at: new Date().toISOString()
+      };
+      if (!("type" in payload)) payload.type = "docx-template-builder-step6-setup";
+      if (!("version" in payload)) payload.version = 1;
+      if (!("exported_at" in payload)) payload.exported_at = new Date().toISOString();
+      payload.preserve_inline_formatting = document.getElementById("preserveInlineCheck").checked;
+      payload.excel_font_name = document.querySelector('[name="excel_font_name"]').value || "";
+      payload.excel_font_size = document.querySelector('[name="excel_font_size"]').value || "11";
+      const currentExcelFiles = excelFiles.map(f => ({id: f.id, name: f.name}));
+      if (importedStep6Payload && Array.isArray(payload.excel_files)) {
+        const knownExcelIds = new Set(payload.excel_files.map(f => f && f.id).filter(Boolean));
+        for (const f of currentExcelFiles) {
+          if (!knownExcelIds.has(f.id)) payload.excel_files.push(f);
+        }
+      } else {
+        payload.excel_files = currentExcelFiles;
+      }
+      payload.headings = headingsState.map(headingForStep6Export);
+      return payload;
+    }
+
+    function exportStep6Setup() {
+      const payload = step6SetupPayload();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type: "application/json"});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      link.href = url;
+      link.download = `step6-setup-${stamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function applyStep6Setup(payload, silent = false) {
+      if (payload && Array.isArray(payload.headings)) importedStep6Payload = deepClone(payload);
+      if (!payload || !Array.isArray(payload.headings)) {
+        if (!silent) alert("File setup không hợp lệ.");
+        return;
+      }
+      syncHeadingStateFromTable();
+      const byOriginal = new Map();
+      const byText = new Map();
+      for (const item of payload.headings) {
+        if (item.original_idx !== null && item.original_idx !== undefined) {
+          byOriginal.set(Number(item.original_idx), item);
+        }
+        byText.set(headingSetupKey(item), item);
+      }
+      let applied = 0;
+      headingsState.forEach(h => {
+        const setup = byOriginal.get(Number(h.original_idx)) || byText.get(headingSetupKey(h));
+        if (!setup) return;
+        h.action = ["keep", "empty", "insert"].includes(setup.action) ? setup.action : "keep";
+        h.auto_number = Boolean(setup.auto_number);
+        h._setupRaw = deepClone(setup);
+        h._dirty = false;
+        if (h.action === "insert" && setup.insert_selection) {
+          h.insert_selection = remapSetupFileId({...setup.insert_selection});
+        } else if (h.action === "insert") {
+          h.insert_selection = defaultSelection();
+        } else {
+          h.insert_selection = nullSelectionTemplate();
+        }
+        applied += 1;
+      });
+      if ("preserve_inline_formatting" in payload) {
+        document.getElementById("preserveInlineCheck").checked = Boolean(payload.preserve_inline_formatting);
+      }
+      if ("excel_font_name" in payload) {
+        document.querySelector('[name="excel_font_name"]').value = payload.excel_font_name || "";
+      }
+      if ("excel_font_size" in payload) {
+        document.querySelector('[name="excel_font_size"]').value = payload.excel_font_size || "11";
+      }
+      const firstInsert = headingsState.findIndex(h => h.action === "insert");
+      selectedExcelHeading = firstInsert >= 0 ? firstInsert : (headingsState.length ? 0 : -1);
+      renderHeadingActions();
+      renderExcelConfig();
+      renderSummary();
+      if (!silent) alert(`Đã import setup cho ${applied}/${headingsState.length} heading.`);
+    }
+
+    function importStep6SetupFile(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          applyStep6Setup(JSON.parse(reader.result));
+        } catch (err) {
+          alert(`Không đọc được file setup: ${err.message}`);
+        } finally {
+          input.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function setControlValue(control, value) {
+      if (!control || value === undefined || value === null) return;
+      if (control.type === "checkbox") {
+        control.checked = Boolean(value);
+      } else {
+        control.value = value;
+      }
+    }
+
+    function selectorValue(value) {
+      if (window.CSS && typeof CSS.escape === "function") return CSS.escape(String(value));
+      return String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    }
+
+    function applySavedPayload(payload) {
+      if (!payload || typeof payload !== "object" || !Object.keys(payload).length) return;
+
+      if (payload.intro_end_idx !== undefined && payload.intro_end_idx !== null) {
+        const introSelect = document.getElementById("introSelect");
+        const value = String(payload.intro_end_idx);
+        if ([...introSelect.options].some(opt => opt.value === value)) {
+          introSelect.value = value;
+          document.getElementById("introEndInput").value = value;
+          buildInitialHeadings();
+          renderAllHeadings();
+        }
+      }
+
+      for (const [key, value] of Object.entries(payload.doc_defaults || {})) {
+        setControlValue(document.querySelector(`[data-dd="${selectorValue(key)}"]`), value);
+      }
+
+      if (Array.isArray(payload.sections)) {
+        payload.sections.forEach((section, index) => {
+          for (const [key, value] of Object.entries(section || {})) {
+            setControlValue(document.querySelector(`[data-section="${index}"][data-key="${selectorValue(key)}"]`), value);
+          }
+        });
+      }
+
+      for (const [oldText, replacement] of Object.entries(payload.intro_replacements || {})) {
+        document.querySelectorAll("[data-intro-old]").forEach(input => {
+          if (input.dataset.introOld === oldText) setControlValue(input, replacement);
+        });
+      }
+
+      for (const [styleId, style] of Object.entries(payload.heading_styles || {})) {
+        for (const [key, value] of Object.entries(style || {})) {
+          setControlValue(document.querySelector(`[data-style="${selectorValue(styleId)}"][data-key="${selectorValue(key)}"]`), value);
+        }
+      }
+
+      const toc = payload.toc_settings || {};
+      setControlValue(document.getElementById("tocEnabledCheck"), toc.enabled);
+      setControlValue(document.getElementById("tocUpdateCheck"), toc.update_on_open);
+      setControlValue(document.getElementById("tocLevelsSelect"), toc.levels);
+      setControlValue(document.getElementById("tocLeaderSelect"), toc.tab_leader);
+      setControlValue(document.getElementById("tocRightTabInput"), toc.right_tab_cm);
+      for (const [styleId, style] of Object.entries(toc.styles || {})) {
+        for (const [key, value] of Object.entries(style || {})) {
+          setControlValue(document.querySelector(`[data-toc-style="${selectorValue(styleId)}"][data-key="${selectorValue(key)}"]`), value);
+        }
+      }
+
+      for (const [key, value] of Object.entries(payload.header_footer_text || {})) {
+        setControlValue(document.querySelector(`[data-hf="${selectorValue(key)}"]`), value);
+      }
+
+      if ("preserve_inline_formatting" in payload) {
+        setControlValue(document.getElementById("preserveInlineCheck"), payload.preserve_inline_formatting);
+      }
+      if ("excel_font_name" in payload) {
+        setControlValue(document.querySelector('[name="excel_font_name"]'), payload.excel_font_name);
+      }
+      if ("excel_font_size" in payload) {
+        setControlValue(document.querySelector('[name="excel_font_size"]'), payload.excel_font_size);
+      }
+
+      if (payload._step6_setup_payload && Array.isArray(payload._step6_setup_payload.headings)) {
+        applyStep6Setup(payload._step6_setup_payload, true);
+      } else if (Array.isArray(payload.headings)) {
+        applyStep6Setup(payload, true);
+      }
     }
 
     function collectDocDefaults() {
@@ -799,6 +2573,23 @@
       return out;
     }
 
+    function collectTocSettings() {
+      const out = {
+        enabled: document.getElementById("tocEnabledCheck").checked,
+        update_on_open: document.getElementById("tocUpdateCheck").checked,
+        levels: Number(document.getElementById("tocLevelsSelect").value || 4),
+        tab_leader: document.getElementById("tocLeaderSelect").value || "none",
+        right_tab_cm: Number(document.getElementById("tocRightTabInput").value || 0),
+        styles: {}
+      };
+      document.querySelectorAll("[data-toc-style]").forEach(inp => {
+        const sid = inp.dataset.tocStyle;
+        out.styles[sid] = out.styles[sid] || {};
+        out.styles[sid][inp.dataset.key] = inp.type === "checkbox" ? inp.checked : inp.value;
+      });
+      return out;
+    }
+
     function collectHeaderFooter() {
       const out = {};
       document.querySelectorAll("[data-hf]").forEach(inp => out[inp.dataset.hf] = inp.value);
@@ -807,16 +2598,18 @@
 
     function syncHiddenFields() {
       syncHeadingStateFromTable();
-      syncHeadingAutoNumber();
-      updateSelectedExcelConfig();
+      updateSelectedExcelConfig(false, false);
+      const step6Payload = step6SetupPayload();
       document.getElementById("introEndInput").value = document.getElementById("introSelect").value;
       document.getElementById("docDefaultsInput").value = JSON.stringify(collectDocDefaults());
       document.getElementById("sectionsInput").value = JSON.stringify(collectSections());
       document.getElementById("introReplInput").value = JSON.stringify(collectIntroReplacements());
       document.getElementById("headingStylesInput").value = JSON.stringify(collectHeadingStyles());
+      document.getElementById("tocSettingsInput").value = JSON.stringify(collectTocSettings());
       document.getElementById("headerFooterInput").value = JSON.stringify(collectHeaderFooter());
       document.getElementById("preserveInlineInput").value = document.getElementById("preserveInlineCheck").checked ? "true" : "false";
-      document.getElementById("headingsConfigInput").value = JSON.stringify(headingsState);
+      document.getElementById("headingsConfigInput").value = JSON.stringify(step6Payload.headings);
+      document.getElementById("step6SetupInput").value = JSON.stringify(step6Payload);
       renderSummary();
     }
 
@@ -830,26 +2623,31 @@
         `Giữ nguyên: ${headingsState.length - insertRows.length - emptyRows.length}`,
         `Để trống: ${emptyRows.length}`,
         `Chèn Excel: ${insertRows.length}`,
+        `Mục lục: level 1-${document.getElementById("tocLevelsSelect").value || 4}, leader ${document.getElementById("tocLeaderSelect").value || "none"}`,
         ""
       ];
       for (const h of insertRows) {
         const sel = h.insert_selection || {};
-        lines.push(`- H${h.level} ${h.text}: ${sel.sheet || ""}, cột ${sel.columns || "(chưa chọn)"}, dòng ${sel.row_start || 1}..${sel.row_end || "end"}`);
+        const adv = ensureAdvancedSettings(sel);
+        const extra = [];
+        if (adv.split_enabled && adv.split_column) extra.push(`tách theo ${adv.split_column}`);
+        if ((adv.merge_columns || []).length) extra.push(`merge ${adv.merge_columns.join(",")}`);
+        lines.push(`- H${h.level} ${h.text}: ${sel.sheet || ""}, cột ${sel.columns || "(chưa chọn)"}, dòng ${sel.row_start || 1}..${sel.row_end || "end"}${extra.length ? ", " + extra.join(", ") : ""}`);
       }
       document.getElementById("summaryBox").textContent = lines.join("\n");
     }
 
     function showStep(step) {
-      currentStep = Math.max(1, Math.min(7, step));
+      currentStep = Math.max(1, Math.min(8, step));
       document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.toggle("active", Number(btn.dataset.step) === currentStep));
       document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", Number(p.dataset.panel) === currentStep));
       document.getElementById("prevStepBtn").hidden = currentStep === 1;
-      document.getElementById("nextStepBtn").hidden = currentStep === 7;
+      document.getElementById("nextStepBtn").hidden = currentStep === 8;
       if (currentStep === 6) {
         renderHeadingActions();
         renderExcelConfig();
       }
-      if (currentStep === 7) {
+      if (currentStep === 8) {
         syncHiddenFields();
       }
     }
@@ -874,8 +2672,10 @@
     renderSections();
     renderIntroText();
     renderHeadingStyles();
+    renderTocStyles();
     renderHeaderFooter();
     buildInitialHeadings();
+    applySavedPayload(savedPayload);
     renderSummary();
     showStep(1);
   </script>

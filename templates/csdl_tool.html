@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tool DQC/STD</title>
+  <style>
+    :root {
+      font-family: "Times New Roman", Times, serif;
+      color: #1f2933;
+      background: #f5f7fa;
+      --line: #d9e2ec;
+      --muted: #52606d;
+      --blue: #0f609b;
+      --blue-dark: #0b4f82;
+      --soft: #eef2f7;
+    }
+    body { margin: 0; padding-bottom: 88px; }
+    main { max-width: 1440px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 18px; margin: 0 0 12px; }
+    h3 { font-size: 15px; margin: 14px 0 8px; }
+    section { margin-top: 0; }
+    label { display: block; font-weight: 700; margin: 10px 0 5px; }
+    input, select, textarea, button { box-sizing: border-box; font-family: inherit; font-size: 15px; }
+    input[type=file], input[type=text], textarea, select {
+      width: 100%; padding: 7px 8px; border: 1px solid #bcccdc; border-radius: 6px; background: #fff;
+    }
+    textarea { min-height: 92px; resize: vertical; font-family: Consolas, monospace; font-size: 13px; }
+    button, a.button {
+      display: inline-block; padding: 8px 12px; border: 0; border-radius: 6px; background: var(--blue);
+      color: white; font-weight: 700; cursor: pointer; text-decoration: none;
+    }
+    button:hover, a.button:hover { background: var(--blue-dark); }
+    button.secondary, a.secondary { background: #52606d; }
+    button.light, button.ghost { background: #d9e2ec; color: #243b53; }
+    button:disabled { background: #bcccdc; cursor: not-allowed; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .hint, .muted { color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .meta { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .step {
+      box-sizing: border-box;
+      height: 46px;
+      padding: 7px 8px;
+      background: #d9e2ec;
+      color: #243b53;
+      border: 1px solid #bcccdc;
+      border-radius: 6px;
+      text-align: left;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      line-height: 1.15;
+      overflow: hidden;
+    }
+    .step.active { background: var(--blue); color: white; border-color: var(--blue); }
+    .step.done { background: #d9e2ec; border-color: #bcccdc; color: #243b53; }
+    .panel {
+      display: none;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 560px;
+    }
+    .panel.active { display: block; }
+    .panel > .actions:last-child { display: none; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+    .right-actions { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric { border: 1px solid var(--line); border-radius: 6px; padding: 12px; background: #f8fafc; }
+    .metric b { display: block; font-size: 24px; margin-top: 4px; }
+    .setup-intro { background: #f0f7ff; border: 1px solid #bcccdc; padding: 12px 14px; border-radius: 8px; margin-bottom: 14px; }
+    .base-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0 18px; }
+    .base-settings textarea { min-height: 132px; }
+    .tabs { display: flex; border-bottom: 1px solid var(--line); gap: 5px; margin: 12px 0; }
+    .tab { background: #eef2f7; color: #243b53; border-radius: 7px 7px 0 0; min-width: 160px; }
+    .tab.active { background: var(--blue); color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .rule-card { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; background: #fff; overflow: hidden; }
+    .rule-card > summary { list-style: none; padding: 13px 14px; cursor: pointer; background: #f8fafc; }
+    .rule-card > summary::-webkit-details-marker { display: none; }
+    .rule-card[open] > summary { border-bottom: 1px solid var(--line); }
+    .rule-body { padding: 0 14px 14px; }
+    .rule-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .rule-sect { margin-top: 14px; padding-top: 10px; border-top: 1px solid #edf2f7; }
+    .rule-sect h4 { margin: 0 0 8px; font-size: 14px; }
+    .datatype-grid { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 8px; }
+    .datatype-box { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: #fbfdff; }
+    .datatype-box small { display: block; color: var(--muted); margin: 3px 0 0 25px; line-height: 1.35; }
+    .condition-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 10px; }
+    .condition { border: 1px solid var(--line); border-radius: 7px; background: #fbfdff; padding: 10px; }
+    .condition label:first-child { margin-top: 0; }
+    .target-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 7px; }
+    .relations { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .relation-list { display: flex; flex-wrap: wrap; gap: 9px 14px; border: 1px solid var(--line); padding: 9px; border-radius: 6px; min-height: 40px; }
+    details.advanced { margin-top: 12px; color: var(--muted); }
+    details.advanced > summary { cursor: pointer; font-weight: 700; }
+    .columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+    .check { display: flex; align-items: center; gap: 8px; font-weight: 400; margin: 0; }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 6px; max-height: 430px; }
+    .output-preview { margin-top: 16px; }
+    .output-preview .table-wrap { max-height: 470px; }
+    table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 7px; vertical-align: top; }
+    th { position: sticky; top: 0; background: #f0f4f8; text-align: left; z-index: 1; }
+    .pill { display: inline-block; min-width: 70px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: #243b53; text-align: center; margin: 1px; font-size: 13px; font-weight: 700; }
+    .error { background: #fff5f5; border: 1px solid #ffbdbd; color: #8a041a; padding: 10px; border-radius: 6px; white-space: pre-wrap; }
+    .success { background: #e3f9e5; border: 1px solid #57ae5b; color: #2f8132; padding: 10px; border-radius: 6px; }
+    .spinner { display: none; color: #52606d; margin-top: 10px; }
+    .spinner.active { display: block; }
+    .footer-nav {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 20;
+      width: min(1280px, calc(100vw - 40px));
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    .footer-nav button { pointer-events: auto; min-width: 108px; }
+    #prevStepBtn { margin-right: auto; }
+    @media (max-width: 860px) {
+      main { padding: 12px; }
+      .steps, .metrics, .grid, .columns, .base-settings, .datatype-grid, .condition-grid, .relations { grid-template-columns: 1fr; }
+      .top { align-items: flex-start; flex-direction: column; }
+      .footer-nav { width: calc(100vw - 24px); bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <h1>Tool tạo DQC/STD từ tài liệu thiết kế CSDL</h1>
+        <p class="hint">Upload tài liệu, cấu hình điều kiện DQC/STD, kiểm tra kết quả và tải file Excel.</p>
+      </div>
+      <a class="button secondary" href="/">Chọn module</a>
+    </div>
+
+    <div class="steps" id="steps"></div>
+
+    <section class="panel active" data-panel="1">
+      <h2>Bước 1: Upload tài liệu</h2>
+      <label>File thiết kế CSDL (.docx)</label>
+      <input type="file" id="docxFiles" accept=".docx" multiple>
+      <p class="hint">Có thể upload nhiều file DOCX. Tool hỗ trợ format A/B như core bạn cung cấp.</p>
+
+      <label>File DQC/STD cũ (.xlsx) - tùy chọn</label>
+      <input type="file" id="existingExcel" accept=".xlsx">
+      <p class="hint">Dùng cho chế độ merge hoặc diff ở bước 4.</p>
+
+      <div class="actions">
+        <span></span>
+        <button type="button" onclick="goStep(2)" id="toStep2">Tiếp theo</button>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="2">
+      <h2>Bước 2: Setup rule DQC/STD</h2>
+      <div class="setup-intro">
+        <b>Cách cấu hình:</b> Chọn rule đang sử dụng, chọn loại dữ liệu và nhập điều kiện text theo từng phạm vi tìm kiếm.
+        Dùng tab <b>DQC</b> hoặc <b>STD</b> để chỉnh riêng từng nhóm; chạy phân tích để kiểm tra kết quả trước khi tạo file.
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button type="button" class="ghost" onclick="downloadConfig()">Export config JSON</button>
+        <label class="button ghost" style="margin:0; color:#1f2933">
+          Import config JSON
+          <input type="file" id="configImport" accept=".json" style="display:none">
+        </label>
+      </div>
+      <div class="base-settings">
+        <label>Nhận diện bảng tham chiếu
+          <span class="hint">Mỗi dòng là một mẫu tên bảng được xem là bảng danh mục/tham chiếu.</span>
+          <textarea id="referencePatterns"></textarea>
+        </label>
+        <label>Bỏ qua trường
+          <span class="hint">Mỗi dòng là tên trường sẽ không được gán DQC/STD.</span>
+          <textarea id="skipFields"></textarea>
+        </label>
+      </div>
+      <h3>Cấu hình rule</h3>
+      <div class="tabs" role="tablist">
+        <button class="tab active" id="dqcTab" type="button" onclick="showRuleTab('dqc')">DQC</button>
+        <button class="tab" id="stdTab" type="button" onclick="showRuleTab('std')">STD</button>
+      </div>
+      <div id="dqcRules" class="tab-content active"></div>
+      <div id="stdRules" class="tab-content"></div>
+      <div class="actions">
+        <button type="button" class="secondary" onclick="goStep(1)">Quay lại</button>
+        <button type="button" onclick="preview()">Phân tích & xem preview</button>
+      </div>
+      <div class="spinner" id="previewSpinner">Đang phân tích tài liệu...</div>
+      <div id="previewError"></div>
+    </section>
+
+    <section class="panel" data-panel="3">
+      <h2>Bước 3: Kết quả phân tích</h2>
+      <div class="metrics" id="metrics"></div>
+      <div id="parseErrors"></div>
+      <h3>Theo rule</h3>
+      <div id="ruleCounts"></div>
+      <h3>Tổng hợp trường</h3>
+      <div class="grid">
+        <label> Lọc theo bảng
+          <select id="tableFilter"></select>
+        </label>
+        <label class="check" style="margin-top:34px">
+          <input type="checkbox" id="onlyPreviewRules">
+          Chỉ hiển thị trường có DQC/STD
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th><th>Bảng</th><th>Loại</th><th>Trường</th><th>Định dạng</th><th>PK/FK</th><th>Mô tả</th><th>DQC</th><th>STD</th>
+            </tr>
+          </thead>
+          <tbody id="previewRows"></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" onclick="goStep(2)">Quay lại setup</button>
+        <button type="button" onclick="goStep(4)">Tùy chọn xuất Excel</button>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="4">
+      <h2>Bước 4: Tùy chọn Excel</h2>
+      <h3>Chọn cột xuất</h3>
+      <div class="columns" id="columnOptions"></div>
+      <h3>Lọc dữ liệu</h3>
+      <label class="check">
+        <input type="checkbox" id="onlyWithRules">
+        Chỉ xuất các trường được gán DQC hoặc STD
+      </label>
+      <h3>Chế độ xử lý file cũ</h3>
+      <select id="excelMode">
+        <option value="overwrite">Ghi đè - tạo file Excel mới</option>
+        <option value="merge">Merge - giữ chỉnh sửa thủ công, thêm code mới</option>
+        <option value="diff">So sánh diff - thêm Note trường / Note bảng</option>
+      </select>
+      <p class="hint">Merge/diff cần upload file DQC/STD cũ ở bước 1.</p>
+      <div class="actions">
+        <button type="button" class="secondary" onclick="goStep(3)">Quay lại preview</button>
+        <button type="button" onclick="goStep(5); generateExcel()">Tạo & xem file Excel</button>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="5">
+      <h2>Bước 5: Xem trước & tải Excel</h2>
+      <div class="spinner active" id="generateSpinner">Đang tạo file Excel và chuẩn bị bản xem trước...</div>
+      <div id="generateResult"></div>
+      <div id="downloadArea"></div>
+      <div class="output-preview" id="excelPreview"></div>
+      <div class="actions">
+        <button type="button" class="secondary" onclick="resetGenerated(); goStep(4)">Quay lại tùy chọn</button>
+        <button type="button" class="secondary" onclick="resetGenerated(); goStep(2)">Quay lại cấu hình</button>
+        <button type="button" onclick="location.reload()">Bắt đầu lại</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer-nav">
+    <button type="button" class="secondary" id="prevStepBtn" onclick="prevStep()">Trước</button>
+    <button type="button" id="nextStepBtn" onclick="nextStep()">Tiếp →</button>
+  </div>
+
+  <script>
+    const DEFAULT_CONFIG = {{ default_config | tojson }};
+    const HEADERS = {{ headers | tojson }};
+    const stepLabels = ["Upload", "Setup rule", "Preview", "Tùy chọn Excel", "Xem & tải"];
+    let currentStep = 1;
+    let config = structuredClone(DEFAULT_CONFIG);
+    let importedConfigRaw = null;
+    let configDirty = false;
+    let previewData = null;
+    let generatedUrl = null;
+    const TARGET_LABELS = {
+      table_name: "Tên bảng",
+      field_name: "Tên trường",
+      description: "Mô tả",
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function renderSteps() {
+      document.getElementById("steps").innerHTML = stepLabels.map((label, idx) => {
+        const n = idx + 1;
+        const cls = n === currentStep ? "active" : n < currentStep ? "done" : "";
+        return `<div class="step ${cls}">${n}. ${label}</div>`;
+      }).join("");
+      renderFooterNav();
+    }
+
+    function goStep(step) {
+      if (step > 1 && document.getElementById("docxFiles").files.length === 0) {
+        alert("Vui lòng upload ít nhất một file .docx.");
+        return;
+      }
+      if (step > 3 && !previewData) {
+        alert("Vui lòng phân tích preview trước.");
+        return;
+      }
+      currentStep = step;
+      document.querySelectorAll(".panel").forEach(panel => {
+        panel.classList.toggle("active", Number(panel.dataset.panel) === step);
+      });
+      renderSteps();
+    }
+
+    function prevStep() {
+      if (currentStep === 1) return;
+      if (currentStep === 5) resetGenerated();
+      goStep(currentStep - 1);
+    }
+
+    function nextStep() {
+      if (currentStep === 1) {
+        goStep(2);
+      } else if (currentStep === 2) {
+        preview();
+      } else if (currentStep === 3) {
+        goStep(4);
+      } else if (currentStep === 4) {
+        goStep(5);
+        generateExcel();
+      }
+    }
+
+    function renderFooterNav() {
+      const prev = document.getElementById("prevStepBtn");
+      const next = document.getElementById("nextStepBtn");
+      if (!prev || !next) return;
+      prev.style.visibility = currentStep === 1 ? "hidden" : "visible";
+      next.style.display = currentStep === 5 ? "none" : "inline-block";
+      const labels = {
+        1: "Tiếp →",
+        2: "Phân tích →",
+        3: "Tiếp →",
+        4: "Tạo Excel →",
+      };
+      next.textContent = labels[currentStep] || "Tiếp →";
+    }
+
+    function listToText(values) {
+      return Array.isArray(values) ? values.join("\n") : "";
+    }
+
+    function textToList(value) {
+      return String(value || "").split("\n").map(x => x.trim()).filter(Boolean);
+    }
+
+    function configForOutput() {
+      return importedConfigRaw && !configDirty ? structuredClone(importedConfigRaw) : collectConfig();
+    }
+
+    function normalizeRuleForEditor(code, rule) {
+      if (!Array.isArray(rule.include_keywords)) {
+        if (Array.isArray(rule.keywords)) {
+          rule.include_keywords = [...rule.keywords];
+          rule.include_targets = ["field_name", "description"];
+        } else if (Array.isArray(rule.description_keywords)) {
+          rule.include_keywords = [...rule.description_keywords];
+          rule.include_targets = ["description"];
+        } else {
+          rule.include_keywords = [];
+        }
+      }
+      if (!Array.isArray(rule.exclude_keywords)) {
+        rule.exclude_keywords = Array.isArray(rule.blacklist_description_keywords)
+          ? [...rule.blacklist_description_keywords] : [];
+        if (rule.exclude_keywords.length) rule.exclude_targets = ["description"];
+      }
+      if (!Array.isArray(rule.pair_terms)) {
+        rule.pair_terms = Array.isArray(rule.pair_prefixes) ? structuredClone(rule.pair_prefixes) : [];
+      }
+      rule.include_targets = rule.include_targets || ["field_name", "description"];
+      rule.exclude_targets = rule.exclude_targets || ["field_name", "description"];
+      rule.pair_targets = rule.pair_targets || ["field_name"];
+      rule.apply_to_datatypes = rule.apply_to_datatypes || ["*"];
+      rule.exclude_datatypes = rule.exclude_datatypes || [];
+      if (typeof rule.apply_to_reference_tables !== "boolean") {
+        rule.apply_to_reference_tables = typeof rule.exclude_reference_tables === "boolean"
+          ? !rule.exclude_reference_tables
+          : true;
+      }
+      rule.requires_rules = rule.requires_rules || (rule.requires ? [rule.requires] : []);
+      rule.exclude_if_rules = rule.exclude_if_rules || (rule.not_if ? [rule.not_if] : []);
+      return rule;
+    }
+
+    function renderConfig() {
+      document.getElementById("referencePatterns").value = listToText(config.reference_table_patterns || []);
+      document.getElementById("skipFields").value = listToText(config.skip_fields || []);
+      const rules = config.rules || {};
+      Object.entries(rules).forEach(([code, rule]) => normalizeRuleForEditor(code, rule));
+      const entries = Object.entries(rules);
+      document.getElementById("dqcRules").innerHTML = entries.filter(([code]) => code.startsWith("DQC_"))
+        .map(([code, rule], idx) => renderRuleCard(code, rule, entries, idx === 0)).join("");
+      document.getElementById("stdRules").innerHTML = entries.filter(([code]) => code.startsWith("STD_"))
+        .map(([code, rule], idx) => renderRuleCard(code, rule, entries, idx === 0)).join("");
+    }
+
+    function showRuleTab(tab) {
+      document.getElementById("dqcTab").classList.toggle("active", tab === "dqc");
+      document.getElementById("stdTab").classList.toggle("active", tab === "std");
+      document.getElementById("dqcRules").classList.toggle("active", tab === "dqc");
+      document.getElementById("stdRules").classList.toggle("active", tab === "std");
+    }
+
+    function renderRuleCard(code, rule, entries, opened) {
+      return `
+        <details class="rule-card" data-rule="${escapeHtml(code)}" ${opened ? "open" : ""}>
+          <summary><div class="rule-head">
+            <label class="check" onclick="event.stopPropagation()">
+              <input type="checkbox" data-field="enabled" ${rule.enabled ? "checked" : ""}>
+              <b>${escapeHtml(code)}</b>
+            </label>
+            <span class="muted">${escapeHtml(rule.short_name || "")}</span>
+          </div></summary>
+          <div class="rule-body">
+            <div class="rule-sect">
+              <label class="check">
+                <input type="checkbox" data-field="apply_to_reference_tables" ${rule.apply_to_reference_tables ? "checked" : ""}>
+                Áp dụng với bảng Reference
+              </label>
+            </div>
+            <div class="rule-sect">
+              <h4>Loại dữ liệu</h4>
+              <div class="grid">
+                <div><b>Áp dụng cho</b>${renderDatatypeOptions(rule.apply_to_datatypes, "apply_to_datatypes")}</div>
+                <div><b>Loại trừ</b>${renderDatatypeOptions(rule.exclude_datatypes, "exclude_datatypes", false)}</div>
+              </div>
+            </div>
+            <div class="rule-sect">
+              <h4>Điều kiện text quy ước</h4>
+              <div class="condition-grid">
+                ${renderCondition("Từ khóa áp dụng", "include_keywords", rule.include_keywords, rule.include_targets)}
+                ${renderCondition("Từ khóa loại trừ", "exclude_keywords", rule.exclude_keywords, rule.exclude_targets)}
+                ${renderCondition("Tiền tố / hậu tố đi theo cặp", "pair_terms", rule.pair_terms.map(pair => pair.join(" | ")), rule.pair_targets)}
+              </div>
+              <p class="hint">Mỗi dòng là một từ khóa. Với cặp, nhập theo dạng <b>tiền tố | hậu tố</b>, ví dụ <code>start_ | end_</code>.</p>
+            </div>
+            <div class="rule-sect relations">
+              ${renderRelations("Chỉ áp dụng khi có rule", "requires_rules", rule.requires_rules, entries, code)}
+              ${renderRelations("Loại trừ khi có rule", "exclude_if_rules", rule.exclude_if_rules, entries, code)}
+            </div>
+            ${renderAdvanced(rule)}
+          </div>
+        </details>`;
+    }
+
+    function renderDatatypeOptions(selected, field, allowAll=true) {
+      const groups = config.datatype_groups || {};
+      const options = allowAll ? [["*", "Tất cả", "Mọi loại dữ liệu", selected.includes("*")]] : [];
+      const seen = new Set();
+      Object.entries(groups).forEach(([group, values]) => values.forEach(value => {
+        if (!seen.has(value)) {
+          options.push([value, value, `Nhóm ${group}`, selected.includes(value) || selected.includes(group)]);
+          seen.add(value);
+        }
+      }));
+      return `<div class="datatype-grid">${options.map(([value, label, desc, checked]) => `
+        <label class="datatype-box check">
+          <input type="checkbox" data-field="${field}" value="${escapeHtml(value)}" ${checked ? "checked" : ""}>
+          <span><b>${escapeHtml(label)}</b><small>${escapeHtml(desc)}</small></span>
+        </label>`).join("")}</div>`;
+    }
+
+    function renderCondition(label, field, values, targets) {
+      return `<div class="condition">
+        <label>${label}</label>
+        <textarea data-field="${field}">${escapeHtml(listToText(values))}</textarea>
+        <span class="hint">Tìm trong:</span>
+        <div class="target-grid">${Object.entries(TARGET_LABELS).map(([target, targetLabel]) => `
+          <label class="check"><input type="checkbox" data-target-kind="${field}" value="${target}" ${targets.includes(target) ? "checked" : ""}>${targetLabel}</label>
+        `).join("")}</div>
+      </div>`;
+    }
+
+    function renderRelations(label, field, selected, entries, currentCode) {
+      return `<div><h4>${label}</h4><div class="relation-list">${entries.filter(([code]) => code !== currentCode).map(([code]) => `
+        <label class="check"><input type="checkbox" data-field="${field}" value="${escapeHtml(code)}" ${selected.includes(code) ? "checked" : ""}>${escapeHtml(code)}</label>
+      `).join("")}</div></div>`;
+    }
+
+    function renderAdvanced(rule) {
+      if (!Array.isArray(rule.name_patterns) && !Array.isArray(rule.blacklist_suffix)) return "";
+      return `<details class="advanced">
+        <summary>Khớp nâng cao đang có trong config</summary>
+        <div class="grid">
+          ${Array.isArray(rule.name_patterns) ? `<label>Mẫu regex tên trường<textarea data-field="name_patterns">${escapeHtml(listToText(rule.name_patterns))}</textarea></label>` : ""}
+          ${Array.isArray(rule.blacklist_suffix) ? `<label>Hậu tố tên trường loại trừ<textarea data-field="blacklist_suffix">${escapeHtml(listToText(rule.blacklist_suffix))}</textarea></label>` : ""}
+        </div>
+      </details>`;
+    }
+
+    function collectConfig() {
+      config.reference_table_patterns = textToList(document.getElementById("referencePatterns").value);
+      config.skip_fields = textToList(document.getElementById("skipFields").value);
+      document.querySelectorAll(".rule-card").forEach(card => {
+        const code = card.dataset.rule;
+        const rule = config.rules[code];
+        rule.enabled = card.querySelector("[data-field='enabled']").checked;
+        rule.apply_to_reference_tables = card.querySelector("[data-field='apply_to_reference_tables']").checked;
+        for (const field of ["apply_to_datatypes", "exclude_datatypes", "requires_rules", "exclude_if_rules"]) {
+          rule[field] = [...card.querySelectorAll(`[data-field='${field}']:checked`)].map(input => input.value);
+        }
+        for (const field of ["include_keywords", "exclude_keywords", "name_patterns", "blacklist_suffix"]) {
+          const input = card.querySelector(`textarea[data-field='${field}']`);
+          if (input) rule[field] = textToList(input.value);
+        }
+        rule.pair_terms = textToList(card.querySelector("textarea[data-field='pair_terms']").value)
+          .map(line => line.split("|").map(value => value.trim()).filter(Boolean))
+          .filter(pair => pair.length >= 2);
+        for (const field of ["include_keywords", "exclude_keywords", "pair_terms"]) {
+          rule[field.replace("keywords", "targets").replace("terms", "targets")] =
+            [...card.querySelectorAll(`[data-target-kind='${field}']:checked`)].map(input => input.value);
+        }
+        delete rule.keywords;
+        delete rule.description_keywords;
+        delete rule.blacklist_description_keywords;
+        delete rule.pair_prefixes;
+        delete rule.requires;
+        delete rule.not_if;
+        delete rule.exclude_reference_tables;
+      });
+      return config;
+    }
+
+    function downloadConfig() {
+      const blob = new Blob([JSON.stringify(configForOutput(), null, 2)], {type: "application/json"});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "dqc_std_config.json";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    document.getElementById("configImport").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        importedConfigRaw = JSON.parse(await file.text());
+        config = structuredClone(importedConfigRaw);
+        configDirty = false;
+        renderConfig();
+      } catch (err) {
+        alert("Config JSON không hợp lệ: " + err.message);
+      }
+    });
+
+    function buildFormData(includeExisting=false) {
+      const form = new FormData();
+      [...document.getElementById("docxFiles").files].forEach(file => form.append("docx_files", file));
+      if (includeExisting) {
+        const existing = document.getElementById("existingExcel").files[0];
+        if (existing) form.append("existing_excel", existing);
+      }
+      form.append("config_json", JSON.stringify(configForOutput()));
+      return form;
+    }
+
+    async function preview() {
+      document.getElementById("previewSpinner").classList.add("active");
+      document.getElementById("previewError").innerHTML = "";
+      try {
+        const res = await fetch("/csdl/preview", {method: "POST", body: buildFormData(false)});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Preview lỗi");
+        previewData = data;
+        renderPreview();
+        goStep(3);
+      } catch (err) {
+        document.getElementById("previewError").innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+      } finally {
+        document.getElementById("previewSpinner").classList.remove("active");
+      }
+    }
+
+    function renderPreview() {
+      const summary = previewData.summary || {};
+      document.getElementById("metrics").innerHTML = [
+        ["Tài liệu", summary.documents || 0],
+        ["Bảng", summary.tables || 0],
+        ["Trường", summary.fields || 0],
+        ["Trường có rule", summary.fields_with_rules || 0],
+      ].map(([label, value]) => `<div class="metric">${label}<b>${value}</b></div>`).join("");
+
+      document.getElementById("parseErrors").innerHTML = (previewData.errors || []).length
+        ? `<p class="error">${previewData.errors.map(e => `${escapeHtml(e.file)}: ${escapeHtml(e.error)}`).join("\n")}</p>`
+        : "";
+
+      const counts = previewData.summary.rule_counts || {};
+      document.getElementById("ruleCounts").innerHTML = Object.entries(counts).map(([code, count]) => {
+        const label = (previewData.dqc_short || {})[code] || (previewData.std_short || {})[code] || "";
+        return `<span class="pill"><b>${escapeHtml(code)}</b> ${count} - ${escapeHtml(label)}</span>`;
+      }).join(" ") || "<p class='muted'>Chưa có rule nào được gán.</p>";
+
+      const tables = [...new Set((previewData.rows || []).map(row => row.table))].sort();
+      document.getElementById("tableFilter").innerHTML = `<option value="">Tất cả</option>` + tables.map(t => `<option>${escapeHtml(t)}</option>`).join("");
+      document.getElementById("tableFilter").onchange = renderRows;
+      document.getElementById("onlyPreviewRules").onchange = renderRows;
+      renderRows();
+    }
+
+    function renderRows() {
+      const tableFilter = document.getElementById("tableFilter").value;
+      const onlyRules = document.getElementById("onlyPreviewRules").checked;
+      let rows = previewData.rows || [];
+      if (tableFilter) rows = rows.filter(row => row.table === tableFilter);
+      if (onlyRules) rows = rows.filter(row => (row.dqc || []).length || (row.std || []).length);
+      document.getElementById("previewRows").innerHTML = rows.map(row => `
+        <tr>
+          <td>${row.stt}</td>
+          <td>${escapeHtml(row.table)}</td>
+          <td>${escapeHtml(row.table_type)}</td>
+          <td>${escapeHtml(row.field)}</td>
+          <td>${escapeHtml(row.datatype)}</td>
+          <td>${escapeHtml(row.pk_fk)}</td>
+          <td>${escapeHtml(row.description)}</td>
+          <td>${(row.dqc || []).map(c => `<span class="pill">${escapeHtml(c)}</span>`).join("")}</td>
+          <td>${(row.std || []).map(c => `<span class="pill">${escapeHtml(c)}</span>`).join("")}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderColumnOptions() {
+      document.getElementById("columnOptions").innerHTML = HEADERS.map((header, idx) => `
+        <label class="check">
+          <input type="checkbox" class="excel-col" value="${escapeHtml(header)}" checked>
+          ${idx + 1}. ${escapeHtml(header)}
+        </label>
+      `).join("");
+    }
+
+    function resetGenerated() {
+      generatedUrl = null;
+      document.getElementById("downloadArea").innerHTML = "";
+      document.getElementById("generateResult").innerHTML = "";
+      document.getElementById("excelPreview").innerHTML = "";
+      document.getElementById("generateSpinner").classList.remove("active");
+    }
+
+    function renderExcelPreview(preview) {
+      const columns = preview.columns || [];
+      const rows = preview.rows || [];
+      const note = preview.truncated
+        ? `Hiển thị ${rows.length}/${preview.row_count} dòng đầu tiên.`
+        : `Hiển thị ${preview.row_count} dòng.`;
+      document.getElementById("excelPreview").innerHTML = `
+        <h3>Preview file Excel</h3>
+        <p class="hint">${escapeHtml(note)}</p>
+        <div class="table-wrap"><table>
+          <thead><tr>${columns.map(column => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead>
+          <tbody>${rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`).join("")}</tbody>
+        </table></div>`;
+    }
+
+    async function generateExcel() {
+      resetGenerated();
+      document.getElementById("generateSpinner").classList.add("active");
+      const form = buildFormData(true);
+      const options = {
+        columns: [...document.querySelectorAll(".excel-col:checked")].map(input => input.value),
+        only_with_rules: document.getElementById("onlyWithRules").checked,
+        mode: document.getElementById("excelMode").value,
+        add_diff_columns: document.getElementById("excelMode").value === "diff",
+      };
+      form.append("options_json", JSON.stringify(options));
+      form.append("preview_output", "true");
+      try {
+        const res = await fetch("/csdl/generate-direct", {method: "POST", body: form});
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.detail || "Tạo file Excel lỗi");
+        }
+        const filename = data.filename || "dqc_std_output.xlsx";
+        generatedUrl = `/csdl/generated/${encodeURIComponent(data.session_id)}/${encodeURIComponent(filename)}`;
+        document.getElementById("generateResult").innerHTML = `<p class="success">Đã tạo xong file Excel. Kiểm tra bản xem trước trước khi tải.</p>`;
+        document.getElementById("downloadArea").innerHTML = `<a class="button" href="${generatedUrl}">Tải file Excel</a>`;
+        renderExcelPreview(data.preview || {});
+      } catch (err) {
+        document.getElementById("generateResult").innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+      } finally {
+        document.getElementById("generateSpinner").classList.remove("active");
+      }
+    }
+
+    for (const target of [document.getElementById("referencePatterns"), document.getElementById("skipFields"), document.getElementById("dqcRules"), document.getElementById("stdRules")]) {
+      target.addEventListener("input", () => { configDirty = true; });
+      target.addEventListener("change", () => { configDirty = true; });
+    }
+
+    renderSteps();
+    renderConfig();
+    renderColumnOptions();
+  </script>
+</body>
+</html>

@@ -59,3 +59,8 @@ def job_manifest_object(job_id):
 def job_output_object(job_id, filename):
     safe = filename.replace("/", "_")
     return f"jobs/{job_id}/output/{safe}"
+
+
+def job_preview_object(job_id, filename):
+    safe = filename.replace("/", "_")
+    return f"jobs/{job_id}/preview/{safe}"

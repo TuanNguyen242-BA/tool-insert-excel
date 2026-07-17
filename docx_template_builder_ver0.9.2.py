@@ -5,14 +5,15 @@ DOCX Template Builder
 Tool đọc thiết lập từ một file Word có sẵn rồi tạo ra một file template
 theo cấu hình do người dùng tuỳ chỉnh.
 
-Quy trình 7 bước (xem các tab trong giao diện):
+Quy trình 8 bước (xem các tab trong giao diện):
   1) Chọn file + nhập trang bắt đầu/kết thúc cho phần mở đầu và phần nội dung
   2) Phân tích & sửa Document defaults và Section properties
   3) Phân tích & sửa nội dung phần mở đầu (text holders, ảnh)
   4) Phân tích & sửa Heading styles, Numbering, Header/Footer của phần nội dung
   5) Liệt kê & chỉnh sửa danh sách heading (auto-renumber)
   6) Chọn heading nào giữ nội dung gốc, heading nào để trống
-  7) Sinh file template
+  7) Cấu hình style mục lục (TOC)
+  8) Sinh file template
 
 Yêu cầu cài đặt:
     pip install python-docx lxml openpyxl
@@ -26,6 +27,7 @@ import copy
 import shutil
 import zipfile
 import tempfile
+import unicodedata
 from pathlib import Path
 from collections import OrderedDict
 
@@ -49,6 +51,7 @@ W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main'
 NSMAP = {'w': W_NS, 'r': R_NS, 'a': A_NS}
+XML_SPACE = '{http://www.w3.org/XML/1998/namespace}space'
 
 def w(tag):
     return f'{{{W_NS}}}{tag}'
@@ -64,7 +67,7 @@ def r(tag):
 def twips_to_cm(t):
     """1 cm = 567 twips"""
     try:
-        return round(int(t) / 567, 2)
+        return round(float(t) / 567, 2)
     except (TypeError, ValueError):
         return 0.0
 
@@ -77,18 +80,28 @@ def cm_to_twips(c):
 def half_pt_to_pt(hp):
     """sz dùng đơn vị half-point: 26 = 13pt"""
     try:
-        return int(hp) / 2
+        return float(hp) / 2
     except (TypeError, ValueError):
         return 0
 
 def pt_to_half_pt(p):
     return int(round(float(p) * 2))
 
+def twips_to_pt(t):
+    """Convert OOXML twips to points, accepting integer or decimal strings."""
+    try:
+        return float(t) / 20
+    except (TypeError, ValueError):
+        return 0.0
+
 def line_to_spacing_str(line, lineRule):
     """Convert (line, lineRule) → human-readable spacing"""
     if not line:
         return '1.0'
-    line = int(line)
+    try:
+        line = float(line)
+    except (TypeError, ValueError):
+        return str(line)
     if lineRule == 'auto':
         return f'{line/240:.2f}'  # 240 = 1.0
     elif lineRule == 'exact':
@@ -104,6 +117,47 @@ def spacing_str_to_line(s):
         return str(int(round(f * 240))), 'auto'
     except ValueError:
         return '240', 'auto'
+
+
+def normalize_match_text(text):
+    text = str(text or '').strip().upper()
+    text = ''.join(
+        ch for ch in unicodedata.normalize('NFKD', text)
+        if not unicodedata.combining(ch)
+    )
+    text = text.replace('Đ', 'D')
+    return re.sub(r'\s+', ' ', text)
+
+
+def default_toc_settings(doc_defaults=None):
+    """Default gọn gàng cho Word TOC styles (TOC1..TOC9)."""
+    doc_defaults = doc_defaults or {}
+    font = doc_defaults.get('font') or 'Times New Roman'
+    base_size = float(doc_defaults.get('size_pt') or 13.0)
+    levels = OrderedDict()
+    for level in range(1, 10):
+        left = 0.0 if level == 1 else round(0.55 + (level - 2) * 0.5, 2)
+        text_tab = round(left + 0.55 + max(level - 1, 0) * 0.12, 2)
+        levels[f'TOC{level}'] = {
+            'font': font,
+            'size_pt': base_size,
+            'bold': level <= 2,
+            'italic': False,
+            'color': '000000',
+            'left_indent_cm': left,
+            'text_tab_cm': text_tab,
+            'space_before_pt': 0.0,
+            'space_after_pt': 2.0 if level <= 3 else 1.0,
+            'line_spacing': '1.15',
+        }
+    return {
+        'enabled': True,
+        'update_on_open': True,
+        'levels': 4,
+        'tab_leader': 'none',
+        'right_tab_cm': 0.0,  # 0 = auto theo usable page width
+        'styles': levels,
+    }
 
 
 # Schema element order theo OOXML — cần để chèn element mới đúng vị trí
@@ -228,6 +282,7 @@ class DocxModel:
             'intro_replacements': {}, # {old_text: new_text}
             'intro_images': {},       # {rId: new_image_path}
             'heading_styles': {},     # {Heading1: {font, size, bold, ...}}
+            'toc_settings': default_toc_settings(),
             'numbering_overrides': {},
             'header_footer_text': {}, # {header2: 'text', footer2: 'text'}
             # Mỗi entry: {level, text, original_idx, keep_content, insert_source, auto_number}
@@ -424,8 +479,8 @@ class DocxModel:
             # Skip MỤC LỤC (Heading 1 này thuộc intro)
             if not text:
                 continue
-            normalized = text.replace('Ụ', 'U').replace('Ụ', 'U')
-            if 'MỤC LỤC' in text or 'MỤC LỤC' in normalized or 'MUC LUC' in normalized:
+            normalized = normalize_match_text(text)
+            if normalized == 'MUC LUC':
                 continue
             return idx
         return 0  # Không tìm thấy → coi như không có intro
@@ -484,6 +539,27 @@ class DocxModel:
         # Heading styles (1-9)
         self.config['heading_styles'] = self._read_heading_styles()
 
+        # TOC styles (TOC1-TOC9), mặc định bám theo document defaults.
+        self.config['toc_settings'] = default_toc_settings(self.config.get('doc_defaults') or {})
+        self._ensure_toc_settings_defaults()
+
+    def _ensure_toc_settings_defaults(self):
+        """Đảm bảo config TOC luôn đủ key khi load file cũ hoặc đổi template."""
+        defaults = default_toc_settings(self.config.get('doc_defaults') or {})
+        current = self.config.get('toc_settings') or {}
+        merged = copy.deepcopy(defaults)
+        for key, value in current.items():
+            if key != 'styles':
+                merged[key] = value
+        current_styles = current.get('styles') or {}
+        for sid, style_defaults in defaults['styles'].items():
+            style = merged['styles'].setdefault(sid, copy.deepcopy(style_defaults))
+            style.update(current_styles.get(sid, {}))
+            for k, v in style_defaults.items():
+                style.setdefault(k, v)
+        self.config['toc_settings'] = merged
+        return merged
+
     def _read_doc_defaults(self):
         result = {
             'font': 'Times New Roman',
@@ -524,10 +600,10 @@ class DocxModel:
                     result['line_spacing'] = line_to_spacing_str(line, rule)
                 before = sp.get(w('before'))
                 if before:
-                    result['space_before'] = int(before) / 20
+                    result['space_before'] = twips_to_pt(before)
                 after = sp.get(w('after'))
                 if after:
-                    result['space_after'] = int(after) / 20
+                    result['space_after'] = twips_to_pt(after)
             ind = ppr.find(w('ind'))
             if ind is not None:
                 left = ind.get(w('left'))
@@ -599,9 +675,9 @@ class DocxModel:
                         sp = ppr.find(w('spacing'))
                         if sp is not None:
                             if sp.get(w('before')):
-                                data['space_before_pt'] = int(sp.get(w('before'))) / 20
+                                data['space_before_pt'] = twips_to_pt(sp.get(w('before')))
                             if sp.get(w('after')):
-                                data['space_after_pt'] = int(sp.get(w('after'))) / 20
+                                data['space_after_pt'] = twips_to_pt(sp.get(w('after')))
                 # Char style (override font/size khi paragraph style không có)
                 if s.get(w('styleId')) == char_id:
                     rpr = s.find(w('rPr'))
@@ -761,6 +837,8 @@ class DocxModel:
         parser = etree.XMLParser(remove_blank_text=False)
         doc_tree = etree.parse(os.path.join(out_dir, 'word/document.xml'), parser)
         styles_tree = etree.parse(os.path.join(out_dir, 'word/styles.xml'), parser)
+        numbering_path = os.path.join(out_dir, 'word/numbering.xml')
+        numbering_tree = etree.parse(numbering_path, parser) if os.path.exists(numbering_path) else None
 
         progress(20, 'Áp dụng document defaults...')
         self._apply_doc_defaults(styles_tree)
@@ -770,6 +848,11 @@ class DocxModel:
 
         progress(40, 'Áp dụng heading styles...')
         self._apply_heading_styles(styles_tree)
+
+        progress(45, 'Áp dụng style mục lục...')
+        self._apply_toc_styles(styles_tree, doc_tree)
+        if numbering_tree is not None:
+            self._ensure_numbering_suffix_spaces(numbering_tree, styles_tree)
 
         progress(50, 'Áp dụng text replacements...')
         self._apply_text_replacements(doc_tree)
@@ -782,18 +865,579 @@ class DocxModel:
 
         progress(85, 'Cập nhật header/footer text...')
         self._apply_header_footer_text(out_dir)
+        toc_cfg = self._ensure_toc_settings_defaults()
+        should_update_toc = toc_cfg.get('enabled', True) and (
+            toc_cfg.get('update_on_open', True) or
+            str(os.getenv('DOCX_BUILDER_MARK_TOC_DIRTY', '')).strip().lower() in {'1', 'true', 'yes'}
+        )
+        if should_update_toc:
+            progress(88, 'Chuẩn bị cập nhật mục lục khi mở file...')
+            self._prepare_toc_fields_for_update(doc_tree)
+            self._enable_field_update_on_open(out_dir)
 
         progress(90, 'Lưu XML trees...')
         doc_tree.write(os.path.join(out_dir, 'word/document.xml'),
                        xml_declaration=True, encoding='UTF-8', standalone=True)
         styles_tree.write(os.path.join(out_dir, 'word/styles.xml'),
                           xml_declaration=True, encoding='UTF-8', standalone=True)
+        if numbering_tree is not None:
+            numbering_tree.write(numbering_path, xml_declaration=True, encoding='UTF-8', standalone=True)
 
         progress(95, 'Đóng gói file docx...')
         self._zip_dir(out_dir, output_path)
         shutil.rmtree(out_dir, ignore_errors=True)
 
         progress(100, 'Hoàn tất')
+
+    def _enable_field_update_on_open(self, out_dir):
+        settings_path = os.path.join(out_dir, 'word/settings.xml')
+        parser = etree.XMLParser(remove_blank_text=False)
+        if os.path.exists(settings_path):
+            tree = etree.parse(settings_path, parser)
+            root = tree.getroot()
+        else:
+            root = etree.Element(w('settings'), nsmap={'w': W_NS})
+            tree = etree.ElementTree(root)
+        update = root.find(w('updateFields'))
+        if update is None:
+            update = etree.SubElement(root, w('updateFields'))
+        update.set(w('val'), 'true')
+        tree.write(settings_path, xml_declaration=True, encoding='UTF-8', standalone=True)
+
+    def _mark_toc_fields_dirty(self, doc_tree):
+        root = doc_tree.getroot()
+        for fld in root.findall(f'.//{w("fldSimple")}'):
+            instr = fld.get(w('instr')) or ''
+            if 'TOC' in instr.upper():
+                fld.set(w('dirty'), 'true')
+                fld.attrib.pop(w('fldLock'), None)
+
+        for p in root.findall(f'.//{w("p")}'):
+            instr_text = ''.join(t.text or '' for t in p.findall(f'.//{w("instrText")}'))
+            if 'TOC' not in instr_text.upper():
+                continue
+            for fld_char in p.findall(f'.//{w("fldChar")}'):
+                fld_char.set(w('dirty'), 'true')
+                fld_char.attrib.pop(w('fldLock'), None)
+
+    def _prepare_toc_fields_for_update(self, doc_tree):
+        """Chuẩn hóa field TOC để Word render lại số trang và format theo TOC styles."""
+        toc_bookmark = self._ensure_content_toc_bookmark(doc_tree)
+        self._ensure_content_starts_on_new_page_after_toc(doc_tree)
+        self._normalize_toc_field_instructions(doc_tree, toc_bookmark)
+        self._normalize_toc_result_number_spacing(doc_tree)
+        self._clean_existing_toc_result_formatting(doc_tree)
+        self._mark_toc_fields_dirty(doc_tree)
+
+    def _normalize_toc_result_number_spacing(self, doc_tree):
+        """Ensure cached TOC entries keep a visible space after manual outline numbers."""
+        root = doc_tree.getroot()
+        number_re = re.compile(r'^(\s*\d+(?:\.\d+)+)(?=\S)')
+        for p in root.findall(f'.//{w("p")}'):
+            ppr = p.find(w('pPr'))
+            if ppr is None:
+                continue
+            pstyle = ppr.find(w('pStyle'))
+            style_id = pstyle.get(w('val')) if pstyle is not None else ''
+            if not re.match(r'TOC\d+$', style_id or ''):
+                continue
+
+            text_nodes = []
+            for run in p.findall(f'.//{w("r")}'):
+                if run.find(w('instrText')) is not None or run.find(w('fldChar')) is not None:
+                    continue
+                text_nodes.extend(run.findall(w('t')))
+            text_nodes = [t for t in text_nodes if t.text]
+            if not text_nodes:
+                continue
+
+            first = text_nodes[0]
+            new_text = number_re.sub(r'\1 ', first.text or '', count=1)
+            if new_text != first.text:
+                first.text = new_text
+                first.set(XML_SPACE, 'preserve')
+                continue
+
+            if re.fullmatch(r'\s*\d+(?:\.\d+)+', first.text or ''):
+                for next_t in text_nodes[1:]:
+                    if next_t.text and not next_t.text[0].isspace():
+                        next_t.text = ' ' + next_t.text
+                        next_t.set(XML_SPACE, 'preserve')
+                        break
+
+    def _ensure_content_toc_bookmark(self, doc_tree):
+        """Tạo bookmark chỉ bao quanh phần nội dung để TOC không lấy heading intro."""
+        root = doc_tree.getroot()
+        body = root.find(w('body'))
+        if body is None:
+            return ''
+        body_children = [el for el in body if el.tag in (w('p'), w('tbl'))]
+        if not body_children:
+            return ''
+
+        first_idx = self._first_content_body_index(body_children)
+        if first_idx is None or first_idx < 0 or first_idx >= len(body_children):
+            return ''
+
+        name = 'ContentTocRange'
+        self._remove_bookmark(root, name)
+        bookmark_id = self._next_bookmark_id(root)
+
+        start_el = body_children[first_idx]
+        if start_el.tag != w('p'):
+            p = etree.Element(w('p'))
+            start_el.addprevious(p)
+            start_el = p
+        self._insert_bookmark_start(start_el, bookmark_id, name)
+
+        end_el = None
+        for el in reversed(body_children):
+            if el.tag == w('p'):
+                end_el = el
+                break
+        if end_el is None:
+            end_el = etree.Element(w('p'))
+            sect_pr = body.find(w('sectPr'))
+            if sect_pr is not None:
+                sect_pr.addprevious(end_el)
+            else:
+                body.append(end_el)
+        end_el.append(self._bookmark_end(bookmark_id))
+        return name
+
+    def _first_content_body_index(self, body_children=None):
+        first_idx = self.config.get('intro_end_idx')
+        for h in self.config.get('headings_list') or []:
+            idx = h.get('original_idx')
+            if idx is not None:
+                first_idx = idx if first_idx is None else min(first_idx, idx)
+                break
+        if first_idx is None:
+            first_idx = self.get_effective_intro_end_idx()
+        try:
+            first_idx = int(first_idx)
+        except (TypeError, ValueError):
+            return None
+        if body_children is not None and not (0 <= first_idx < len(body_children)):
+            return None
+        return first_idx
+
+    def _remove_bookmark(self, root, name):
+        for start in list(root.findall(f'.//{w("bookmarkStart")}')):
+            if start.get(w('name')) != name:
+                continue
+            bookmark_id = start.get(w('id'))
+            parent = start.getparent()
+            if parent is not None:
+                parent.remove(start)
+            for end in list(root.findall(f'.//{w("bookmarkEnd")}')):
+                if end.get(w('id')) == bookmark_id:
+                    end_parent = end.getparent()
+                    if end_parent is not None:
+                        end_parent.remove(end)
+
+    def _next_bookmark_id(self, root):
+        max_id = 0
+        for el in root.findall(f'.//{w("bookmarkStart")}') + root.findall(f'.//{w("bookmarkEnd")}'):
+            try:
+                max_id = max(max_id, int(el.get(w('id')) or 0))
+            except ValueError:
+                pass
+        return str(max_id + 1)
+
+    def _insert_bookmark_start(self, paragraph, bookmark_id, name):
+        bm = etree.Element(w('bookmarkStart'))
+        bm.set(w('id'), str(bookmark_id))
+        bm.set(w('name'), name)
+        insert_at = 0
+        if len(paragraph) and paragraph[0].tag == w('pPr'):
+            insert_at = 1
+        paragraph.insert(insert_at, bm)
+
+    def _bookmark_end(self, bookmark_id):
+        bm = etree.Element(w('bookmarkEnd'))
+        bm.set(w('id'), str(bookmark_id))
+        return bm
+
+    def _allocate_bookmark_id(self, root):
+        current = getattr(self, '_bookmark_id_counter', None)
+        if current is None:
+            current = int(self._next_bookmark_id(root))
+        self._bookmark_id_counter = current + 1
+        return str(current)
+
+    def _safe_bookmark_name(self, prefix, text):
+        raw = normalize_match_text(text)
+        raw = re.sub(r'[^A-Z0-9_]+', '_', raw).strip('_')[:28] or 'ITEM'
+        seed = abs(hash((prefix, raw))) % 1000000
+        return f'{prefix}_{raw}_{seed}'
+
+    def _ensure_paragraph_bookmark(self, doc_root, paragraph, name):
+        if paragraph is None or paragraph.tag != w('p'):
+            return ''
+        for bm in paragraph.findall(w('bookmarkStart')):
+            if bm.get(w('name')) == name:
+                return name
+        bookmark_id = self._allocate_bookmark_id(doc_root)
+        self._insert_bookmark_start(paragraph, bookmark_id, name)
+        paragraph.append(self._bookmark_end(bookmark_id))
+        return name
+
+    def _collect_child_heading_bookmarks(self, doc_tree, body_children, target_idx):
+        if target_idx is None or target_idx < 0 or target_idx >= len(body_children):
+            return {}
+        root = doc_tree.getroot()
+        target_el = body_children[target_idx]
+        target_style = self._paragraph_style_id(target_el)
+        match = re.match(r'Heading(\d+)$', target_style or '')
+        base_level = int(match.group(1)) if match else 0
+        result = {}
+        for idx in range(target_idx + 1, len(body_children)):
+            el = body_children[idx]
+            if el.tag != w('p'):
+                continue
+            style_id = self._paragraph_style_id(el)
+            m = re.match(r'Heading(\d+)$', style_id or '')
+            if not m:
+                continue
+            level = int(m.group(1))
+            if base_level and level <= base_level:
+                break
+            text = ''.join(t.text or '' for t in el.iter(w('t'))).strip()
+            key = self._normalize_internal_link_key(text)
+            if not key:
+                continue
+            bookmark = self._safe_bookmark_name('ILINK', text)
+            result[key] = self._ensure_paragraph_bookmark(root, el, bookmark)
+        return result
+
+    def _ensure_content_starts_on_new_page_after_toc(self, doc_tree):
+        """Đặt page break trước heading nội dung đầu tiên để TOC và nội dung không chung trang."""
+        root = doc_tree.getroot()
+        body = root.find(w('body'))
+        if body is None:
+            return
+        body_children = [el for el in body if el.tag in (w('p'), w('tbl'))]
+        first_idx = self._first_content_body_index(body_children)
+        if first_idx is None:
+            return
+        if first_idx < 0 or first_idx >= len(body_children):
+            return
+        first_content = body_children[first_idx]
+        if first_content.tag != w('p'):
+            return
+        ppr = first_content.find(w('pPr'))
+        if ppr is None:
+            ppr = etree.Element(w('pPr'))
+            first_content.insert(0, ppr)
+        ensure_child(ppr, 'pageBreakBefore', PPR_ORDER)
+
+    def _normalize_toc_field_instructions(self, doc_tree, bookmark_name=''):
+        cfg = self._ensure_toc_settings_defaults()
+        levels = int(cfg.get('levels') or 4)
+        levels = max(1, min(9, levels))
+        bookmark_switch = f' \\b "{bookmark_name}"' if bookmark_name else ''
+        instr = f'TOC \\o "1-{levels}" \\h \\z \\u{bookmark_switch}'
+
+        root = doc_tree.getroot()
+        for fld in root.findall(f'.//{w("fldSimple")}'):
+            old_instr = fld.get(w('instr')) or ''
+            if 'TOC' in old_instr.upper():
+                fld.set(w('instr'), instr)
+
+        for p in root.findall(f'.//{w("p")}'):
+            instr_nodes = p.findall(f'.//{w("instrText")}')
+            instr_text = ''.join(t.text or '' for t in instr_nodes)
+            if 'TOC' not in instr_text.upper() or not instr_nodes:
+                continue
+            instr_nodes[0].text = ' ' + instr + ' '
+            instr_nodes[0].set(XML_SPACE, 'preserve')
+            for extra in instr_nodes[1:]:
+                extra.text = ''
+
+    def _clean_existing_toc_result_formatting(self, doc_tree):
+        """
+        Xóa direct format trong các paragraph TOC cũ để lần refresh kế tiếp dùng
+        đúng TOC1..TOC9. Giữ pStyle và field code, chỉ bỏ override trình bày.
+        """
+        toc_styles = (self._ensure_toc_settings_defaults().get('styles') or {})
+        root = doc_tree.getroot()
+        for p in root.findall(f'.//{w("p")}'):
+            ppr = p.find(w('pPr'))
+            if ppr is None:
+                continue
+            pstyle = ppr.find(w('pStyle'))
+            style_id = pstyle.get(w('val')) if pstyle is not None else ''
+            if not re.match(r'TOC\d+$', style_id or ''):
+                continue
+
+            for child in list(ppr):
+                if child.tag != w('pStyle'):
+                    ppr.remove(child)
+
+            for run in p.findall(w('r')):
+                if run.find(w('instrText')) is not None or run.find(w('fldChar')) is not None:
+                    continue
+                rpr = run.find(w('rPr'))
+                if rpr is not None:
+                    run.remove(rpr)
+                data = toc_styles.get(style_id) or {}
+                if data:
+                    self._apply_toc_result_run_format(run, data)
+
+    def _apply_toc_result_run_format(self, run, data):
+        """Apply TOC settings to cached TOC result text so Word shows the chosen size immediately."""
+        rpr = run.find(w('rPr'))
+        if rpr is None:
+            rpr = etree.Element(w('rPr'))
+            run.insert(0, rpr)
+        if data.get('font'):
+            rfonts = ensure_child(rpr, 'rFonts', RPR_ORDER)
+            for a in ['ascii', 'eastAsia', 'hAnsi', 'cs']:
+                rfonts.set(w(a), data['font'])
+        if data.get('size_pt'):
+            size_val = str(pt_to_half_pt(float(data.get('size_pt'))))
+            ensure_child(rpr, 'sz', RPR_ORDER).set(w('val'), size_val)
+            ensure_child(rpr, 'szCs', RPR_ORDER).set(w('val'), size_val)
+        self._set_flag(rpr, 'b', bool(data.get('bold')))
+        self._set_flag(rpr, 'bCs', bool(data.get('bold')))
+        self._set_flag(rpr, 'i', bool(data.get('italic')))
+        self._set_flag(rpr, 'iCs', bool(data.get('italic')))
+        if data.get('color'):
+            ensure_child(rpr, 'color', RPR_ORDER).set(w('val'), data.get('color'))
+
+    def _apply_toc_styles(self, styles_tree, doc_tree):
+        cfg = self._ensure_toc_settings_defaults()
+        if not cfg.get('enabled', True):
+            return
+
+        root = styles_tree.getroot()
+        page_width_twips = self._compute_page_content_width(doc_tree)
+        if cfg.get('right_tab_cm'):
+            page_width_twips = cm_to_twips(cfg.get('right_tab_cm'))
+
+        leader = (cfg.get('tab_leader') or 'none').strip()
+        leader_map = {
+            'none': None,
+            'dot': 'dot',
+            'hyphen': 'hyphen',
+            'underscore': 'underscore',
+        }
+        leader_val = leader_map.get(leader, None)
+
+        for sid, data in (cfg.get('styles') or {}).items():
+            if not re.match(r'TOC\d+$', sid):
+                continue
+            style_el = self._ensure_paragraph_style(root, sid, sid.replace('TOC', 'toc '))
+
+            ppr = style_el.find(w('pPr'))
+            rpr = style_el.find(w('rPr'))
+            if ppr is None:
+                ppr = etree.Element(w('pPr'))
+                if rpr is not None:
+                    rpr.addprevious(ppr)
+                else:
+                    style_el.append(ppr)
+            if rpr is None:
+                rpr = etree.SubElement(style_el, w('rPr'))
+
+            ind = ensure_child(ppr, 'ind', PPR_ORDER)
+            ind.set(w('left'), str(cm_to_twips(data.get('left_indent_cm', 0))))
+            ind.attrib.pop(w('firstLine'), None)
+            ind.attrib.pop(w('hanging'), None)
+
+            old_tabs = ppr.find(w('tabs'))
+            if old_tabs is not None:
+                ppr.remove(old_tabs)
+            tabs = ensure_child(ppr, 'tabs', PPR_ORDER)
+            text_tab_cm = float(data.get('text_tab_cm') or 0)
+            if text_tab_cm > 0:
+                tab_text = etree.SubElement(tabs, w('tab'))
+                tab_text.set(w('val'), 'left')
+                tab_text.set(w('pos'), str(cm_to_twips(text_tab_cm)))
+            tab_page = etree.SubElement(tabs, w('tab'))
+            tab_page.set(w('val'), 'right')
+            tab_page.set(w('pos'), str(page_width_twips))
+            if leader_val:
+                tab_page.set(w('leader'), leader_val)
+
+            sp = ensure_child(ppr, 'spacing', PPR_ORDER)
+            sp.set(w('before'), str(int(float(data.get('space_before_pt', 0)) * 20)))
+            sp.set(w('after'), str(int(float(data.get('space_after_pt', 0)) * 20)))
+            line, rule = spacing_str_to_line(str(data.get('line_spacing') or '1.15'))
+            sp.set(w('line'), line)
+            sp.set(w('lineRule'), rule)
+
+            if data.get('font'):
+                rfonts = ensure_child(rpr, 'rFonts', RPR_ORDER)
+                for a in ['ascii', 'eastAsia', 'hAnsi', 'cs']:
+                    rfonts.set(w(a), data['font'])
+            if data.get('size_pt'):
+                size_val = str(pt_to_half_pt(float(data.get('size_pt'))))
+                ensure_child(rpr, 'sz', RPR_ORDER).set(w('val'), size_val)
+                ensure_child(rpr, 'szCs', RPR_ORDER).set(w('val'), size_val)
+            self._set_flag(rpr, 'b', bool(data.get('bold')))
+            self._set_flag(rpr, 'bCs', bool(data.get('bold')))
+            self._set_flag(rpr, 'i', bool(data.get('italic')))
+            self._set_flag(rpr, 'iCs', bool(data.get('italic')))
+            if data.get('color'):
+                ensure_child(rpr, 'color', RPR_ORDER).set(w('val'), data.get('color'))
+
+    def _ensure_numbering_suffix_spaces(self, numbering_tree, styles_tree):
+        """Make Word's own TOC refresh keep a separator after heading numbers."""
+        if numbering_tree is None:
+            return
+        root = numbering_tree.getroot()
+        heading_abstract_ids = set()
+        num_to_abs = {}
+        for num in root.findall(w('num')):
+            num_id = num.get(w('numId'))
+            abs_el = num.find(w('abstractNumId'))
+            if num_id and abs_el is not None:
+                num_to_abs[str(num_id)] = str(abs_el.get(w('val')) or '')
+
+        for level in range(1, 10):
+            style_id = f'Heading{level}'
+            num_pr = self._style_num_pr(styles_tree, style_id)
+            num_id, _ilvl = self._num_pr_values(num_pr)
+            if num_id and str(num_id) in num_to_abs:
+                heading_abstract_ids.add(num_to_abs[str(num_id)])
+
+        for abs_num in root.findall(w('abstractNum')):
+            abs_id = str(abs_num.get(w('abstractNumId')) or '')
+            has_heading_style = any(
+                (lvl.find(w('pStyle')) is not None and
+                 re.match(r'Heading\d+$', lvl.find(w('pStyle')).get(w('val')) or ''))
+                for lvl in abs_num.findall(w('lvl'))
+            )
+            if not has_heading_style and abs_id not in heading_abstract_ids:
+                continue
+            for lvl in abs_num.findall(w('lvl')):
+                suff = lvl.find(w('suff'))
+                if suff is None:
+                    suff = etree.SubElement(lvl, w('suff'))
+                suff.set(w('val'), 'space')
+
+    def _paragraph_style_id(self, p):
+        ppr = p.find(w('pPr')) if p is not None else None
+        pstyle = ppr.find(w('pStyle')) if ppr is not None else None
+        return pstyle.get(w('val')) if pstyle is not None else ''
+
+    def _style_num_pr(self, styles_tree, style_id):
+        if styles_tree is None or not style_id:
+            return None
+        root = styles_tree.getroot()
+        for style in root.findall(w('style')):
+            if style.get(w('styleId')) != style_id:
+                continue
+            ppr = style.find(w('pPr'))
+            return ppr.find(w('numPr')) if ppr is not None else None
+        return None
+
+    def _num_pr_values(self, num_pr):
+        if num_pr is None:
+            return None, None
+        num_id_el = num_pr.find(w('numId'))
+        ilvl_el = num_pr.find(w('ilvl'))
+        num_id = num_id_el.get(w('val')) if num_id_el is not None else None
+        ilvl = ilvl_el.get(w('val')) if ilvl_el is not None else None
+        try:
+            ilvl = int(ilvl) if ilvl is not None else 0
+        except (TypeError, ValueError):
+            ilvl = 0
+        return num_id, ilvl
+
+    def _paragraph_num_pr(self, p, styles_tree):
+        ppr = p.find(w('pPr')) if p is not None else None
+        num_pr = ppr.find(w('numPr')) if ppr is not None else None
+        num_id, ilvl = self._num_pr_values(num_pr)
+        if num_id:
+            return num_id, ilvl
+        return self._num_pr_values(self._style_num_pr(styles_tree, self._paragraph_style_id(p)))
+
+    def _resolve_heading_number_map(self, body_children, styles_tree):
+        """Resolve Word numbering for heading paragraphs in current body order."""
+        if self.numbering_xml is None:
+            return {}
+        root = self.numbering_xml.getroot()
+        num_to_abs = {}
+        abs_levels = {}
+        for num in root.findall(w('num')):
+            num_id = num.get(w('numId'))
+            abs_el = num.find(w('abstractNumId'))
+            if num_id and abs_el is not None:
+                num_to_abs[str(num_id)] = str(abs_el.get(w('val')) or '')
+        for abs_num in root.findall(w('abstractNum')):
+            abs_id = str(abs_num.get(w('abstractNumId')) or '')
+            levels = {}
+            for lvl in abs_num.findall(w('lvl')):
+                try:
+                    ilvl = int(lvl.get(w('ilvl')) or 0)
+                except (TypeError, ValueError):
+                    ilvl = 0
+                lvl_text_el = lvl.find(w('lvlText'))
+                start_el = lvl.find(w('start'))
+                try:
+                    start = int(start_el.get(w('val')) or 1) if start_el is not None else 1
+                except (TypeError, ValueError):
+                    start = 1
+                levels[ilvl] = {
+                    'text': lvl_text_el.get(w('val')) if lvl_text_el is not None else '',
+                    'start': start,
+                }
+            abs_levels[abs_id] = levels
+
+        counters_by_num = {}
+        result = {}
+        for idx, el in enumerate(body_children):
+            if el.tag != w('p'):
+                continue
+            num_id, ilvl = self._paragraph_num_pr(el, styles_tree)
+            if not num_id:
+                continue
+            num_id = str(num_id)
+            abs_id = num_to_abs.get(num_id)
+            if abs_id is None:
+                continue
+            counters = counters_by_num.setdefault(num_id, [0] * 10)
+            level_data = (abs_levels.get(abs_id) or {}).get(ilvl, {})
+            if counters[ilvl] == 0:
+                counters[ilvl] = int(level_data.get('start') or 1)
+            else:
+                counters[ilvl] += 1
+            for deeper in range(ilvl + 1, len(counters)):
+                counters[deeper] = 0
+
+            style_id = self._paragraph_style_id(el)
+            if not re.match(r'Heading\d+$', style_id or ''):
+                continue
+            lvl_text = str(level_data.get('text') or '')
+            if lvl_text:
+                number = lvl_text
+                for n in range(1, 10):
+                    value = counters[n - 1] if counters[n - 1] else 1
+                    number = number.replace(f'%{n}', str(value))
+                number = re.sub(r'%\d+', '', number)
+            else:
+                number = '.'.join(str(counters[n]) for n in range(ilvl + 1) if counters[n])
+            number = re.sub(r'\s+', ' ', number).strip()
+            result[idx] = number.rstrip('.')
+        return result
+
+    def _ensure_paragraph_style(self, styles_root, style_id, style_name):
+        for s in styles_root.findall(w('style')):
+            if s.get(w('styleId')) == style_id:
+                return s
+        s = etree.SubElement(styles_root, w('style'))
+        s.set(w('type'), 'paragraph')
+        s.set(w('styleId'), style_id)
+        name = etree.SubElement(s, w('name'))
+        name.set(w('val'), style_name)
+        based_on = etree.SubElement(s, w('basedOn'))
+        based_on.set(w('val'), 'Normal')
+        next_el = etree.SubElement(s, w('next'))
+        next_el.set(w('val'), 'Normal')
+        return s
 
     def _zip_dir(self, src_dir, output_path):
         if os.path.exists(output_path):
@@ -943,6 +1587,66 @@ class DocxModel:
                     shutil.copy2(new_path, abs_target)
                     break
 
+    def _reorder_body_blocks_by_heading_order(self, body, body_children, headings_list):
+        """Move original heading content blocks to match the configured heading order."""
+        original_indexes = []
+        seen = set()
+        for h in headings_list:
+            idx = h.get('original_idx')
+            if idx is None:
+                continue
+            try:
+                idx = int(idx)
+            except (TypeError, ValueError):
+                continue
+            if idx in seen or not (0 <= idx < len(body_children)):
+                continue
+            seen.add(idx)
+            original_indexes.append(idx)
+
+        if not original_indexes:
+            return {}
+
+        sorted_indexes = sorted(original_indexes)
+        next_by_original = {}
+        for pos, idx in enumerate(sorted_indexes):
+            next_by_original[idx] = (
+                sorted_indexes[pos + 1] if pos + 1 < len(sorted_indexes) else len(body_children)
+            )
+
+        block_by_original = {
+            idx: body_children[idx:next_by_original[idx]]
+            for idx in sorted_indexes
+        }
+        ordered_indexes = original_indexes + [idx for idx in sorted_indexes if idx not in seen]
+        if ordered_indexes != sorted_indexes:
+            first_el = body_children[sorted_indexes[0]]
+            anchor = first_el.getprevious()
+            for idx in sorted_indexes:
+                for el in block_by_original[idx]:
+                    parent = el.getparent()
+                    if parent is body:
+                        parent.remove(el)
+
+            last = anchor
+            insert_at_start = last is None
+            for idx in ordered_indexes:
+                for el in block_by_original[idx]:
+                    if insert_at_start:
+                        body.insert(0, el)
+                        last = el
+                        insert_at_start = False
+                    else:
+                        last.addnext(el)
+                        last = el
+
+        refreshed = [el for el in body if el.tag in (w('p'), w('tbl'))]
+        return {
+            idx: refreshed.index(block_by_original[idx][0])
+            for idx in sorted_indexes
+            if block_by_original[idx] and block_by_original[idx][0] in refreshed
+        }
+
     def _apply_headings_and_content(self, doc_tree, styles_tree, progress_callback=None):
         """
         - Đổi text các heading theo config['headings_list']
@@ -963,7 +1667,19 @@ class DocxModel:
         body_children = [el for el in body if el.tag in (w('p'), w('tbl'))]
 
         # Cache page content width — dùng khi build bảng từ Excel để fit page
+        original_idx_to_current_idx = self._reorder_body_blocks_by_heading_order(
+            body, body_children, headings_list
+        )
+        body_children = [el for el in body if el.tag in (w('p'), w('tbl'))]
         self._cached_page_width = self._compute_page_content_width(doc_tree)
+        current_heading_indexes = sorted(original_idx_to_current_idx.values())
+        resolved_heading_numbers = self._resolve_heading_number_map(body_children, styles_tree)
+
+        def next_current_heading_index(cur_idx):
+            for current_idx in current_heading_indexes:
+                if current_idx > cur_idx:
+                    return current_idx
+            return len(body_children)
 
         # Tính số thứ tự dạng "1.", "1.1.", "1.2.1." dựa trên thứ tự trong list
         counters = [0] * 10
@@ -978,12 +1694,19 @@ class DocxModel:
                     counters[k] = 1
             num_str = '.'.join(str(counters[k]) for k in range(1, lvl + 1))
             numbered.append(num_str)
+        number_by_original_idx = {
+            int(entry['original_idx']): num_str
+            for entry, num_str in zip(headings_list, numbered)
+            if entry.get('original_idx') is not None
+        }
 
         # Áp text mới + số (chỉ với entry đã có original_idx)
         for entry, num_str in zip(headings_list, numbered):
             if entry.get('original_idx') is None:
                 continue
-            idx = entry['original_idx']
+            idx = original_idx_to_current_idx.get(int(entry['original_idx']))
+            if idx is None:
+                continue
             if idx >= len(body_children):
                 continue
             el = body_children[idx]
@@ -995,19 +1718,16 @@ class DocxModel:
         # Chuẩn bị plan: với mỗi heading bỏ tick, lưu reference đến heading element
         # và xác định range cần xoá. Sau khi xoá xong sẽ chèn empty/external sau heading_el.
         plans = []
-        for entry_idx, entry in enumerate(headings_list):
+        for entry in headings_list:
             if entry.get('keep_content', True):
                 continue
             if entry.get('original_idx') is None:
                 continue
-            cur_idx = entry['original_idx']
+            cur_idx = original_idx_to_current_idx.get(int(entry['original_idx']))
+            if cur_idx is None:
+                continue
             # Tìm heading kế tiếp BẤT KỲ (level nào cũng được)
-            next_entry_orig_idx = None
-            for j in range(entry_idx + 1, len(headings_list)):
-                if headings_list[j].get('original_idx') is not None:
-                    next_entry_orig_idx = headings_list[j]['original_idx']
-                    break
-            end_idx = next_entry_orig_idx if next_entry_orig_idx is not None else len(body_children)
+            end_idx = next_current_heading_index(cur_idx)
 
             if cur_idx < len(body_children):
                 heading_el = body_children[cur_idx]
@@ -1016,12 +1736,33 @@ class DocxModel:
                     if k < len(body_children) and body_children[k].tag == w('tbl'):
                         table_format_hint = self._extract_table_format_hint(body_children[k])
                         break
+                plan_selection = entry.get('insert_selection') or None
+                if isinstance(plan_selection, dict):
+                    plan_selection = copy.deepcopy(plan_selection)
+                    advanced = plan_selection.setdefault('advanced', {})
+                    if isinstance(advanced, dict):
+                        advanced['_parent_heading_level'] = entry.get('level') or 1
+                        parent_number = resolved_heading_numbers.get(cur_idx)
+                        if not parent_number and entry.get('auto_number', False):
+                            parent_number = number_by_original_idx.get(int(entry['original_idx']))
+                        advanced['_parent_heading_number'] = parent_number or ''
+                        advanced['_parent_heading_auto_number'] = bool(entry.get('auto_number', False))
+                        target_original_idx = advanced.get('internal_link_target_heading_original_idx')
+                        try:
+                            target_original_idx = int(target_original_idx)
+                        except (TypeError, ValueError):
+                            target_original_idx = None
+                        if target_original_idx is not None:
+                            target_current_idx = original_idx_to_current_idx.get(target_original_idx)
+                            advanced['_internal_link_bookmarks'] = self._collect_child_heading_bookmarks(
+                                doc_tree, body_children, target_current_idx
+                            )
                 plans.append({
                     'heading_el': heading_el,
                     'start_idx': cur_idx + 1,
                     'end_idx': end_idx,
                     'insert_source': entry.get('insert_source') or None,
-                    'insert_selection': entry.get('insert_selection') or None,
+                    'insert_selection': plan_selection,
                     'heading_text': entry.get('text', ''),
                     'page_width': self._compute_page_content_width_for_index(doc_tree, cur_idx),
                     'table_format_hint': table_format_hint,
@@ -1211,6 +1952,67 @@ class DocxModel:
         pStyle = etree.SubElement(pPr, w('pStyle'))
         pStyle.set(w('val'), 'Normal')
         return p
+
+    def _make_text_paragraph(self, text='', force_left=True, runs=None):
+        p = self._create_empty_paragraph()
+        pPr = p.find(w('pPr'))
+        if force_left and pPr is not None:
+            jc = ensure_child(pPr, 'jc', PPR_ORDER)
+            jc.set(w('val'), 'left')
+        run_specs = runs if isinstance(runs, list) else [{'text': text}]
+        for spec in run_specs:
+            run = etree.SubElement(p, w('r'))
+            style = spec.get('style') if isinstance(spec, dict) else {}
+            if style:
+                rpr = etree.SubElement(run, w('rPr'))
+                if style.get('bold'):
+                    ensure_child(rpr, 'b', RPR_ORDER)
+                    ensure_child(rpr, 'bCs', RPR_ORDER)
+                if style.get('italic'):
+                    ensure_child(rpr, 'i', RPR_ORDER)
+                    ensure_child(rpr, 'iCs', RPR_ORDER)
+                if style.get('underline'):
+                    u = ensure_child(rpr, 'u', RPR_ORDER)
+                    u.set(w('val'), 'single')
+            t = etree.SubElement(run, w('t'))
+            t.text = str(spec.get('text', '') if isinstance(spec, dict) else spec)
+            t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+        return p
+
+    def _make_text_paragraphs_from_excel_text(self, prefix, value, prefix_style=None, force_left=True):
+        prefix_text = str(prefix or '').replace('\r\n', '\n').replace('\r', '\n')
+        value_lines = str(value or '').replace('\r\n', '\n').replace('\r', '\n').split('\n') or ['']
+        prefix_style = prefix_style if isinstance(prefix_style, dict) else {}
+        paragraphs = []
+        if not prefix_text:
+            return [self._make_text_paragraph(line, force_left=force_left) for line in value_lines]
+
+        prefix_lines = prefix_text.split('\n')
+        prefix_ends_line = prefix_text.endswith('\n')
+        standalone_prefix_lines = prefix_lines[:-1] if prefix_ends_line else prefix_lines[:-1]
+        for line in standalone_prefix_lines:
+            paragraphs.append(self._make_text_paragraph(
+                force_left=force_left,
+                runs=[{'text': line, 'style': prefix_style}],
+            ))
+
+        if prefix_ends_line:
+            for line in value_lines:
+                paragraphs.append(self._make_text_paragraph(line, force_left=force_left))
+            return paragraphs
+
+        last_prefix = prefix_lines[-1] if prefix_lines else ''
+        first_value = value_lines[0] if value_lines else ''
+        paragraphs.append(self._make_text_paragraph(
+            force_left=force_left,
+            runs=[
+                {'text': last_prefix, 'style': prefix_style},
+                {'text': first_value, 'style': {}},
+            ],
+        ))
+        for line in value_lines[1:]:
+            paragraphs.append(self._make_text_paragraph(line, force_left=force_left))
+        return paragraphs
 
     # ============================================================
     # Đọc nội dung từ file Word/Excel khác để chèn vào template
@@ -1405,15 +2207,590 @@ class DocxModel:
         selection = selection or {'mode': 'all'}
         mode = selection.get('mode', 'custom')
 
-        # Bỏ read_only=True để max_row/max_column populate đúng
-        wb = load_workbook(source_path, data_only=True)
+        class _ExcelCellView:
+            """Cell view: formula result from data_only workbook, formatting from source workbook."""
+            def __init__(self, value_cell, style_cell):
+                self._value_cell = value_cell
+                self._style_cell = style_cell
+                self._override_value = None
+                self._has_override = False
+                self.row = getattr(style_cell, 'row', getattr(value_cell, 'row', None))
+                self.column = getattr(style_cell, 'column', getattr(value_cell, 'column', None))
+                self.parent = getattr(style_cell, 'parent', getattr(value_cell, 'parent', None))
+
+            @property
+            def value(self):
+                if self._has_override:
+                    return self._override_value
+                return getattr(self._value_cell, 'value', None)
+
+            @value.setter
+            def value(self, value):
+                self._override_value = value
+                self._has_override = True
+
+            def __getattr__(self, name):
+                return getattr(self._style_cell, name)
+
+        class _SyntheticExcelCellView:
+            """Small cell-like object for values generated by advanced table transforms."""
+            def __init__(self, value='', style_cell=None):
+                self.value = value
+                self._style_cell = style_cell
+                self.row = getattr(style_cell, 'row', None)
+                self.column = getattr(style_cell, 'column', None)
+                self.parent = getattr(style_cell, 'parent', None)
+                self.number_format = getattr(style_cell, 'number_format', 'General')
+                self.font = copy.copy(getattr(style_cell, 'font', None)) if style_cell is not None else None
+                self.alignment = copy.copy(getattr(style_cell, 'alignment', None)) if style_cell is not None else None
+                self.hyperlink = None
+
+        # Bỏ read_only=True để max_row/max_column populate đúng.
+        # Mở 2 workbook: data_only lấy giá trị công thức đã cache, workbook gốc giữ style/hyperlink.
+        wb_values = load_workbook(source_path, data_only=True)
+        wb = load_workbook(source_path, data_only=False)
+
+        def _wrap_cell(value_ws, style_cell):
+            if style_cell is None:
+                return None
+            value_cell = value_ws.cell(row=style_cell.row, column=style_cell.column)
+            return _ExcelCellView(value_cell, style_cell)
+
+        def _wrap_iter_rows(value_ws, style_ws):
+            return [
+                [_wrap_cell(value_ws, cell) for cell in row]
+                for row in style_ws.iter_rows()
+            ]
+
+        def _adv_bool_from(advanced_cfg, key, default=False):
+            value = (advanced_cfg or {}).get(key, default)
+            if isinstance(value, bool):
+                return value
+            return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'y'}
+
+        def _cell_display_text(cell):
+            if cell is None or cell.value is None:
+                return ''
+            value = cell.value
+            if hasattr(value, 'isoformat'):
+                value = value.isoformat()
+            return str(value).strip()
+
+        def _cell_has_real_value(cell):
+            if cell is None:
+                return False
+            value = getattr(cell, 'value', None)
+            if value is None:
+                return False
+            if isinstance(value, str):
+                return bool(value.strip())
+            return True
+
+        def _effective_auto_row_end(style_ws, value_ws, row_start, col_indexes, extra_columns=None):
+            """Find the real last data row when UI row_end is left empty.
+
+            Excel files often keep formatting far below the actual table. In that
+            case openpyxl's max_row points to the formatted area, and generating
+            a DOCX table for every empty formatted row can look like a stuck job.
+            """
+            columns = {
+                int(c) for c in (col_indexes or [])
+                if str(c).strip().isdigit() and int(c) > 0
+            }
+            columns.update(
+                int(c) for c in (extra_columns or [])
+                if str(c).strip().isdigit() and int(c) > 0
+            )
+            if not columns:
+                columns = set(range(1, (style_ws.max_column or 1) + 1))
+
+            last_row = None
+            for ws_candidate in (style_ws, value_ws):
+                cells = getattr(ws_candidate, '_cells', {}) or {}
+                for coord, cell in cells.items():
+                    try:
+                        row_idx, col_idx = coord
+                    except (TypeError, ValueError):
+                        continue
+                    if row_idx < row_start or col_idx not in columns:
+                        continue
+                    if _cell_has_real_value(cell):
+                        last_row = max(last_row or row_start, int(row_idx))
+
+            if last_row is not None:
+                return max(row_start, last_row)
+            return row_start
+
+        def _apply_auto_stt(rows, merge_positions, advanced_cfg):
+            if not _adv_bool_from(advanced_cfg, 'auto_stt_enabled', False):
+                return rows, merge_positions
+            if not rows:
+                return rows, merge_positions
+
+            shifted_merge_positions = {int(pos) + 1 for pos in (merge_positions or set())}
+            merge_stt = 1 in shifted_merge_positions
+            new_rows = []
+            header_style = rows[0][0] if rows[0] else None
+            new_rows.append([_SyntheticExcelCellView('STT', header_style)] + rows[0])
+
+            current_no = 0
+            last_key = object()
+            for row in rows[1:]:
+                key = _cell_display_text(row[0] if row else None) if merge_stt else None
+                if merge_stt:
+                    if key != last_key:
+                        current_no += 1
+                        last_key = key
+                    number = current_no
+                else:
+                    current_no += 1
+                    number = current_no
+                style_cell = row[0] if row else header_style
+                new_rows.append([_SyntheticExcelCellView(number, style_cell)] + row)
+
+            if merge_stt:
+                shifted_merge_positions.add(0)
+            return new_rows, shifted_merge_positions
+
+        def _internal_link_positions(col_indexes, advanced_cfg):
+            if not _adv_bool_from(advanced_cfg, 'internal_link_enabled', False):
+                return {}
+            try:
+                link_col = int((advanced_cfg or {}).get('internal_link_column') or 0)
+            except (TypeError, ValueError):
+                link_col = 0
+            if not link_col:
+                return {}
+            bookmarks = (advanced_cfg or {}).get('_internal_link_bookmarks') or {}
+            if not isinstance(bookmarks, dict):
+                bookmarks = {}
+            positions = {
+                pos for pos, col_idx in enumerate(col_indexes or [])
+                if int(col_idx) == link_col
+            }
+            offset = 1 if _adv_bool_from(advanced_cfg, 'auto_stt_enabled', False) else 0
+            return {pos + offset: bookmarks for pos in positions}
+
+        def _normalize_lookup_key(value):
+            text = unicodedata.normalize('NFD', str(value or '').strip())
+            text = ''.join(ch for ch in text if unicodedata.category(ch) != 'Mn')
+            return re.sub(r'\s+', ' ', text).lower()
+
+        def _merged_cell_display_text(ws, row, col):
+            cell = ws.cell(row=row, column=col)
+            value = cell.value
+            if value is None:
+                for merged_range in ws.merged_cells.ranges:
+                    if cell.coordinate in merged_range:
+                        value = ws.cell(merged_range.min_row, merged_range.min_col).value
+                        break
+            if value is None:
+                return ''
+            if hasattr(value, 'isoformat'):
+                value = value.isoformat()
+            return str(value).strip()
+
+        lookup_rule_cache = {}
+        lookup_rule_any_column_cache = {}
+
+        def _lookup_values_for_rule(rule):
+            src_path = str(rule.get('source_path') or '').strip()
+            sheet_name = str(rule.get('sheet') or '').strip()
+            try:
+                key_col = int(rule.get('key_column') or 0)
+                value_col = int(rule.get('value_column') or 0)
+            except (TypeError, ValueError):
+                return {}
+            if not src_path or not sheet_name or not key_col or not value_col:
+                return {}
+
+            try:
+                row_start = max(1, int(rule.get('row_start') or 1))
+            except (TypeError, ValueError):
+                row_start = 1
+            row_end_raw = rule.get('row_end')
+            signature = (src_path, sheet_name, key_col, value_col, row_start, str(row_end_raw or ''))
+            if signature in lookup_rule_cache:
+                return lookup_rule_cache[signature]
+
+            values_by_key = {}
+            lookup_wb = None
+            try:
+                lookup_wb = load_workbook(src_path, data_only=True)
+                if sheet_name not in lookup_wb.sheetnames:
+                    lookup_rule_cache[signature] = values_by_key
+                    return values_by_key
+                lookup_ws = lookup_wb[sheet_name]
+                try:
+                    row_end = int(row_end_raw) if row_end_raw not in (None, '', 0, '0') else lookup_ws.max_row
+                except (TypeError, ValueError):
+                    row_end = lookup_ws.max_row
+                for row_idx in range(row_start, max(row_start, row_end) + 1):
+                    key_text = _merged_cell_display_text(lookup_ws, row_idx, key_col)
+                    normalized = _normalize_lookup_key(key_text)
+                    if not normalized:
+                        continue
+                    value_text = _merged_cell_display_text(lookup_ws, row_idx, value_col)
+                    if not value_text:
+                        continue
+                    bucket = values_by_key.setdefault(normalized, [])
+                    if value_text not in bucket:
+                        bucket.append(value_text)
+            except Exception:
+                values_by_key = {}
+            finally:
+                if lookup_wb is not None:
+                    try:
+                        lookup_wb.close()
+                    except Exception:
+                        pass
+            lookup_rule_cache[signature] = values_by_key
+            return values_by_key
+
+        def _lookup_values_for_rule_any_column(rule):
+            src_path = str(rule.get('source_path') or '').strip()
+            sheet_name = str(rule.get('sheet') or '').strip()
+            try:
+                value_col = int(rule.get('value_column') or 0)
+            except (TypeError, ValueError):
+                return {}
+            if not src_path or not sheet_name or not value_col:
+                return {}
+
+            try:
+                row_start = max(1, int(rule.get('row_start') or 1))
+            except (TypeError, ValueError):
+                row_start = 1
+            row_end_raw = rule.get('row_end')
+            signature = (src_path, sheet_name, value_col, row_start, str(row_end_raw or ''))
+            if signature in lookup_rule_any_column_cache:
+                return lookup_rule_any_column_cache[signature]
+
+            values_by_key = {}
+            lookup_wb = None
+            try:
+                lookup_wb = load_workbook(src_path, data_only=True)
+                if sheet_name not in lookup_wb.sheetnames:
+                    lookup_rule_any_column_cache[signature] = values_by_key
+                    return values_by_key
+                lookup_ws = lookup_wb[sheet_name]
+                try:
+                    row_end = int(row_end_raw) if row_end_raw not in (None, '', 0, '0') else lookup_ws.max_row
+                except (TypeError, ValueError):
+                    row_end = lookup_ws.max_row
+
+                for row_idx in range(row_start, max(row_start, row_end) + 1):
+                    value_text = _merged_cell_display_text(lookup_ws, row_idx, value_col)
+                    if not value_text:
+                        continue
+                    row_keys = set()
+                    for col_idx in range(1, (lookup_ws.max_column or 1) + 1):
+                        key_text = _merged_cell_display_text(lookup_ws, row_idx, col_idx)
+                        normalized = _normalize_lookup_key(key_text)
+                        if normalized:
+                            row_keys.add(normalized)
+                    for normalized in row_keys:
+                        bucket = values_by_key.setdefault(normalized, [])
+                        if value_text not in bucket:
+                            bucket.append(value_text)
+            except Exception:
+                values_by_key = {}
+            finally:
+                if lookup_wb is not None:
+                    try:
+                        lookup_wb.close()
+                    except Exception:
+                        pass
+            lookup_rule_any_column_cache[signature] = values_by_key
+            return values_by_key
+
+        def _lookup_text_paragraphs(group_key, advanced_cfg):
+            rules = (advanced_cfg or {}).get('split_text_rules') or []
+            if not isinstance(rules, list):
+                return []
+            out = []
+            lookup_key = _normalize_lookup_key(group_key)
+            for rule in rules:
+                if not isinstance(rule, dict) or not _adv_bool_from(rule, 'enabled', True):
+                    continue
+                prefix_text = str(rule.get('prefix') or '')
+                prefix_style = {
+                    'bold': _adv_bool_from(rule, 'prefix_bold', False),
+                    'italic': _adv_bool_from(rule, 'prefix_italic', False),
+                    'underline': _adv_bool_from(rule, 'prefix_underline', False),
+                }
+                force_left = _adv_bool_from(rule, 'force_left', True)
+                values = _lookup_values_for_rule(rule).get(lookup_key, [])
+                if not values:
+                    values = _lookup_values_for_rule_any_column(rule).get(lookup_key, [])
+                for value_text in values:
+                    out.extend(self._make_text_paragraphs_from_excel_text(
+                        prefix_text, value_text, prefix_style, force_left
+                    ))
+            return out
+
+        def _without_multi_sources(advanced_cfg):
+            clone = copy.deepcopy(advanced_cfg or {})
+            clone.pop('split_sources', None)
+            clone.pop('multi_source_mode', None)
+            return clone
+
+        def _source_title(src_path, src_selection):
+            sheet_title = str((src_selection or {}).get('sheet') or '').strip()
+            file_title = Path(src_path).stem if src_path else ''
+            return sheet_title or file_title or 'Nguồn'
+
+        def _table_elements_from_rows(rows, col_indexes, merge_positions, advanced_cfg, group_key=None):
+            link_columns = _internal_link_positions(col_indexes, advanced_cfg)
+            table_rows, table_merge_positions = _apply_auto_stt(
+                rows, merge_positions, advanced_cfg
+            )
+            tbl = self._build_table_from_cell_rows(
+                table_rows, preserve_inline,
+                auto_merge_columns=table_merge_positions,
+                internal_link_columns=link_columns,
+            )
+            if tbl is None:
+                return []
+            extra = _lookup_text_paragraphs(group_key, advanced_cfg) if group_key is not None else []
+            return [tbl, *extra, self._create_empty_paragraph()]
+
+        def _prepare_custom_split_source(src_path, src_selection):
+            """Return split groups for one custom Excel source used by interleave mode."""
+            src_selection = src_selection or {}
+            src_mode = src_selection.get('mode', 'custom')
+            src_wb_values = wb_values if str(src_path) == str(source_path) else load_workbook(src_path, data_only=True)
+            src_wb = wb if str(src_path) == str(source_path) else load_workbook(src_path, data_only=False)
+            sheet_name = src_selection.get('sheet')
+            if not sheet_name or sheet_name not in src_wb.sheetnames:
+                raise ValueError(f'Sheet "{sheet_name}" không tồn tại trong file.')
+            src_ws = src_wb[sheet_name]
+            src_value_ws = src_wb_values[sheet_name]
+            advanced_cfg = src_selection.get('advanced') or {}
+            if not isinstance(advanced_cfg, dict):
+                advanced_cfg = {}
+
+            if src_mode == 'range':
+                rows = self._extract_rows_from_range(src_ws, src_selection.get('range') or '', src_value_ws)
+                col_indexes = list(range(1, max((len(row) for row in rows), default=0) + 1))
+                row_start = 1
+                row_end = len(rows)
+            else:
+                cols_spec = (src_selection.get('columns') or '').strip()
+                if cols_spec:
+                    col_indexes = self._parse_column_spec(cols_spec)
+                else:
+                    col_indexes = list(range(1, (src_ws.max_column or 1) + 1))
+                if not col_indexes:
+                    raise ValueError(f'Danh sách cột custom không hợp lệ: "{cols_spec}"')
+
+                try:
+                    row_start = max(1, int(src_selection.get('row_start') or 1))
+                except (TypeError, ValueError):
+                    row_start = 1
+                try:
+                    row_end = int(src_selection.get('row_end')) if src_selection.get('row_end') not in (None, '', 0, '0') else None
+                except (TypeError, ValueError):
+                    row_end = None
+                if row_end is None:
+                    extra_columns = [advanced_cfg.get('split_column')]
+                    row_end = _effective_auto_row_end(
+                        src_ws, src_value_ws, row_start, col_indexes, extra_columns
+                    )
+                row_end = max(row_start, row_end)
+
+                rows = []
+                for r in range(row_start, row_end + 1):
+                    rows.append([
+                        _ExcelCellView(
+                            src_value_ws.cell(row=r, column=c),
+                            src_ws.cell(row=r, column=c),
+                        )
+                        for c in col_indexes
+                    ])
+
+            header_overrides = src_selection.get('header_overrides') or {}
+            if rows and isinstance(header_overrides, dict):
+                for pos, col_idx in enumerate(col_indexes):
+                    new_header = header_overrides.get(str(col_idx), header_overrides.get(col_idx))
+                    if new_header is not None and pos < len(rows[0]):
+                        rows[0][pos].value = str(new_header)
+
+            merge_source_columns = advanced_cfg.get('merge_columns') or []
+            if not isinstance(merge_source_columns, (list, tuple, set)):
+                merge_source_columns = []
+            merge_source_columns = {
+                int(c) for c in merge_source_columns
+                if str(c).strip().isdigit()
+            }
+            merge_positions = {
+                pos for pos, col_idx in enumerate(col_indexes)
+                if int(col_idx) in merge_source_columns
+            }
+
+            split_column = advanced_cfg.get('split_column')
+            try:
+                split_column = int(split_column)
+            except (TypeError, ValueError):
+                split_column = None
+
+            header_row = rows[0] if rows else []
+            grouped = []
+            group_by_key = {}
+            if _adv_bool_from(advanced_cfg, 'split_enabled', False) and split_column:
+                for excel_row in range(row_start + 1, row_end + 1):
+                    row_pos = excel_row - row_start
+                    if row_pos < 0 or row_pos >= len(rows):
+                        continue
+                    group_cell = _ExcelCellView(
+                        src_value_ws.cell(row=excel_row, column=split_column),
+                        src_ws.cell(row=excel_row, column=split_column),
+                    )
+                    key = _cell_display_text(group_cell) or '(Trống)'
+                    if key not in group_by_key:
+                        group_by_key[key] = []
+                        grouped.append((key, group_by_key[key]))
+                    group_by_key[key].append(rows[row_pos])
+            elif rows:
+                grouped.append((_source_title(src_path, src_selection), rows[1:] if header_row else rows))
+
+            return {
+                'title': _source_title(src_path, src_selection),
+                'header_row': header_row,
+                'groups': grouped,
+                'group_map': {key: data_rows for key, data_rows in grouped},
+                'col_indexes': col_indexes,
+                'merge_positions': merge_positions,
+                'advanced': advanced_cfg,
+            }
+
+        def _build_interleaved_sources(sources, root_advanced):
+            prepared = [
+                item for item in (
+                    _prepare_custom_split_source(src_path, src_selection)
+                    for src_path, src_selection in sources
+                )
+                if item.get('groups')
+            ]
+            if not prepared:
+                return []
+
+            add_heading = _adv_bool_from(root_advanced, 'add_split_heading', False)
+            prefix = str(root_advanced.get('heading_prefix', 'Bảng ') or '')
+            suffix = str(root_advanced.get('heading_suffix', '') or '')
+            add_group_heading = _adv_bool_from(root_advanced, 'interleave_group_heading_enabled', True)
+            group_prefix = str(root_advanced.get('interleave_group_heading_prefix', 'Cụm ') or '')
+            group_suffix = str(root_advanced.get('interleave_group_heading_suffix', '') or '')
+            parent_level = root_advanced.get('_parent_heading_level') or 1
+            try:
+                group_heading_level = min(9, max(1, int(parent_level) + 1))
+            except (TypeError, ValueError):
+                group_heading_level = 4
+            table_heading_level = min(9, group_heading_level + 1) if add_group_heading else group_heading_level
+            parent_number = str(root_advanced.get('_parent_heading_number') or '').strip()
+            heading_style = self._advanced_heading_style(root_advanced)
+
+            out = []
+            max_group_count = max(len(item['groups']) for item in prepared)
+            for group_pos in range(max_group_count):
+                group_items = []
+                for item in prepared:
+                    if group_pos >= len(item['groups']):
+                        continue
+                    group_key, data_rows = item['groups'][group_pos]
+                    if not data_rows:
+                        continue
+                    group_items.append((item, group_key, data_rows))
+                if not group_items:
+                    continue
+
+                cluster_idx = group_pos + 1
+                cluster_number = f'{parent_number}.{cluster_idx}' if parent_number else ''
+                if add_heading and add_group_heading:
+                    cluster_key = group_items[0][1]
+                    cluster_text = f'{group_prefix}{cluster_key}{group_suffix}'
+                    if cluster_number:
+                        cluster_text = f'{cluster_number} {cluster_text}'
+                    out.append(self._make_subheading_paragraph(
+                        cluster_text, group_heading_level, heading_style
+                    ))
+
+                for inner_idx, (item, group_key, data_rows) in enumerate(group_items, start=1):
+                    bookmark_name = ''
+                    if add_heading:
+                        heading_text = f'{prefix}{group_key}{suffix}'
+                        if add_group_heading and cluster_number:
+                            heading_text = f'{cluster_number}.{inner_idx} {heading_text}'
+                        elif parent_number:
+                            flat_idx = group_pos * len(prepared) + inner_idx
+                            heading_text = f'{parent_number}.{flat_idx} {heading_text}'
+                        if _adv_bool_from(root_advanced, 'internal_link_enabled', False):
+                            bookmark_name = self._safe_bookmark_name('ILINK', group_key)
+                            item['advanced'].setdefault('_internal_link_bookmarks', {})[
+                                self._normalize_internal_link_key(group_key)
+                            ] = bookmark_name
+                        out.append(self._make_subheading_paragraph(
+                            heading_text, table_heading_level, heading_style, bookmark_name
+                        ))
+                    tbl_rows = [item['header_row']] + data_rows if item['header_row'] else data_rows
+                    out.extend(_table_elements_from_rows(
+                        tbl_rows,
+                        item['col_indexes'],
+                        item['merge_positions'],
+                        item['advanced'],
+                        group_key,
+                    ))
+            return out
+
+        advanced_root = selection.get('advanced') or {}
+        if isinstance(advanced_root, dict) and advanced_root.get('split_sources'):
+            sources = []
+            base_selection = copy.deepcopy(selection)
+            base_selection['advanced'] = _without_multi_sources(advanced_root)
+            sources.append((source_path, base_selection))
+            for src in advanced_root.get('split_sources') or []:
+                if not isinstance(src, dict):
+                    continue
+                src_path = str(src.get('source_path') or '').strip()
+                if not src_path:
+                    continue
+                src_selection = copy.deepcopy(selection)
+                src_selection.update({
+                    'mode': 'custom',
+                    'file_id': src.get('file_id') or selection.get('file_id'),
+                    'sheet': src.get('sheet') or selection.get('sheet'),
+                    'columns': src.get('columns') or selection.get('columns'),
+                    'row_start': src.get('row_start') or selection.get('row_start') or 1,
+                    'row_end': src.get('row_end') if src.get('row_end') not in ('', None) else selection.get('row_end'),
+                })
+                src_adv = _without_multi_sources(advanced_root)
+                if src.get('split_column'):
+                    src_adv['split_column'] = src.get('split_column')
+                src_selection['advanced'] = src_adv
+                sources.append((src_path, src_selection))
+            if str(advanced_root.get('multi_source_mode') or '').strip().lower() == 'interleave':
+                return _build_interleaved_sources(sources, _without_multi_sources(advanced_root))
+            multi_elements = []
+            next_heading_index = 1
+            for src_path, src_selection in sources:
+                src_selection = copy.deepcopy(src_selection)
+                src_advanced = src_selection.get('advanced') if isinstance(src_selection.get('advanced'), dict) else {}
+                src_advanced['_split_heading_start_index'] = next_heading_index
+                src_selection['advanced'] = src_advanced
+                multi_elements.extend(self._read_excel_content(src_path, preserve_inline, src_selection))
+                try:
+                    next_heading_index += len(_prepare_custom_split_source(src_path, src_selection).get('groups') or [])
+                except Exception:
+                    next_heading_index += 0
+            return multi_elements
+
         elements = []
 
         if mode == 'all':
             for ws in wb.worksheets:
                 if len(wb.worksheets) > 1:
                     elements.append(self._make_subheading_paragraph(ws.title))
-                rows = [list(r) for r in ws.iter_rows()]
+                rows = _wrap_iter_rows(wb_values[ws.title], ws)
                 tbl = self._build_table_from_cell_rows(rows, preserve_inline)
                 if tbl is not None:
                     elements.append(tbl)
@@ -1424,11 +2801,135 @@ class DocxModel:
                 raise ValueError(f'Sheet "{sheet_name}" không tồn tại trong file. '
                                  f'Các sheet có sẵn: {wb.sheetnames}')
             ws = wb[sheet_name]
-            rows = [list(r) for r in ws.iter_rows()]
-            tbl = self._build_table_from_cell_rows(rows, preserve_inline)
-            if tbl is not None:
-                elements.append(tbl)
-                elements.append(self._create_empty_paragraph())
+            rows = _wrap_iter_rows(wb_values[sheet_name], ws)
+            col_indexes = list(range(1, max((len(row) for row in rows), default=0) + 1))
+            row_start = 1
+            row_end = len(rows)
+            value_ws = wb_values[sheet_name]
+            advanced = selection.get('advanced') or {}
+            if not isinstance(advanced, dict):
+                advanced = {}
+
+            def _adv_bool(key, default=False):
+                value = advanced.get(key, default)
+                if isinstance(value, bool):
+                    return value
+                return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'y'}
+
+            def _cell_display_text(cell):
+                if cell is None or cell.value is None:
+                    return ''
+                value = cell.value
+                if hasattr(value, 'isoformat'):
+                    value = value.isoformat()
+                return str(value).strip()
+
+            merge_source_columns = advanced.get('merge_columns') or []
+            if not isinstance(merge_source_columns, (list, tuple, set)):
+                merge_source_columns = []
+            merge_source_columns = {
+                int(c) for c in merge_source_columns
+                if str(c).strip().isdigit()
+            }
+            merge_positions = {
+                pos for pos, col_idx in enumerate(col_indexes)
+                if int(col_idx) in merge_source_columns
+            }
+
+            split_enabled = _adv_bool('split_enabled', False)
+            split_column = advanced.get('split_column')
+            try:
+                split_column = int(split_column)
+            except (TypeError, ValueError):
+                split_column = None
+
+            if split_enabled and split_column:
+                header_row = rows[0] if rows else []
+                grouped = []
+                group_by_key = {}
+                for excel_row in range(row_start + 1, row_end + 1):
+                    group_cell = _ExcelCellView(
+                        value_ws.cell(row=excel_row, column=split_column),
+                        ws.cell(row=excel_row, column=split_column),
+                    )
+                    key = _cell_display_text(group_cell) or '(Trống)'
+                    if key not in group_by_key:
+                        group_by_key[key] = []
+                        grouped.append((key, group_by_key[key]))
+                    group_by_key[key].append(rows[excel_row - row_start])
+
+                if not grouped:
+                    link_columns = _internal_link_positions(col_indexes, advanced)
+                    table_rows, table_merge_positions = _apply_auto_stt(
+                        rows, merge_positions, advanced
+                    )
+                    tbl = self._build_table_from_cell_rows(
+                        table_rows, preserve_inline,
+                        auto_merge_columns=table_merge_positions,
+                        internal_link_columns=link_columns,
+                    )
+                    if tbl is not None:
+                        elements.append(tbl)
+                        elements.append(self._create_empty_paragraph())
+                    return elements
+
+                add_heading = _adv_bool('add_split_heading', False)
+                prefix = str(advanced.get('heading_prefix', 'Bảng ') or '')
+                suffix = str(advanced.get('heading_suffix', '') or '')
+                parent_level = advanced.get('_parent_heading_level') or 1
+                try:
+                    heading_level = min(9, max(1, int(parent_level) + 1))
+                except (TypeError, ValueError):
+                    heading_level = 4
+                parent_number = str(advanced.get('_parent_heading_number') or '').strip()
+                try:
+                    split_heading_start_index = max(1, int(advanced.get('_split_heading_start_index') or 1))
+                except (TypeError, ValueError):
+                    split_heading_start_index = 1
+                heading_style = self._advanced_heading_style(advanced)
+
+                for group_idx, (group_key, data_rows) in enumerate(grouped, start=1):
+                    heading_idx = split_heading_start_index + group_idx - 1
+                    bookmark_name = ''
+                    if add_heading:
+                        heading_text = f'{prefix}{group_key}{suffix}'
+                        if parent_number:
+                            heading_text = f'{parent_number}.{heading_idx} {heading_text}'
+                        if _adv_bool_from(advanced, 'internal_link_enabled', False):
+                            bookmark_name = self._safe_bookmark_name('ILINK', group_key)
+                            advanced.setdefault('_internal_link_bookmarks', {})[
+                                self._normalize_internal_link_key(group_key)
+                            ] = bookmark_name
+                        elements.append(self._make_subheading_paragraph(
+                            heading_text, heading_level, heading_style, bookmark_name
+                        ))
+                    tbl_rows = [header_row] + data_rows if header_row else data_rows
+                    link_columns = _internal_link_positions(col_indexes, advanced)
+                    tbl_rows, table_merge_positions = _apply_auto_stt(
+                        tbl_rows, merge_positions, advanced
+                    )
+                    tbl = self._build_table_from_cell_rows(
+                        tbl_rows, preserve_inline,
+                        auto_merge_columns=table_merge_positions,
+                        internal_link_columns=link_columns,
+                    )
+                    if tbl is not None:
+                        elements.append(tbl)
+                        elements.extend(_lookup_text_paragraphs(group_key, advanced))
+                        elements.append(self._create_empty_paragraph())
+            else:
+                link_columns = _internal_link_positions(col_indexes, advanced)
+                table_rows, table_merge_positions = _apply_auto_stt(
+                    rows, merge_positions, advanced
+                )
+                tbl = self._build_table_from_cell_rows(
+                    table_rows, preserve_inline,
+                    auto_merge_columns=table_merge_positions,
+                    internal_link_columns=link_columns,
+                )
+                if tbl is not None:
+                    elements.append(tbl)
+                    elements.append(self._create_empty_paragraph())
         elif mode == 'range':
             sheet_name = selection.get('sheet')
             range_str = (selection.get('range') or '').strip()
@@ -1437,11 +2938,135 @@ class DocxModel:
             if not range_str:
                 raise ValueError('Range không được để trống khi mode=range')
             ws = wb[sheet_name]
-            rows = self._extract_rows_from_range(ws, range_str)
-            tbl = self._build_table_from_cell_rows(rows, preserve_inline)
-            if tbl is not None:
-                elements.append(tbl)
-                elements.append(self._create_empty_paragraph())
+            rows = self._extract_rows_from_range(ws, range_str, wb_values[sheet_name])
+            col_indexes = list(range(1, max((len(row) for row in rows), default=0) + 1))
+            row_start = 1
+            row_end = len(rows)
+            value_ws = wb_values[sheet_name]
+            advanced = selection.get('advanced') or {}
+            if not isinstance(advanced, dict):
+                advanced = {}
+
+            def _adv_bool(key, default=False):
+                value = advanced.get(key, default)
+                if isinstance(value, bool):
+                    return value
+                return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'y'}
+
+            def _cell_display_text(cell):
+                if cell is None or cell.value is None:
+                    return ''
+                value = cell.value
+                if hasattr(value, 'isoformat'):
+                    value = value.isoformat()
+                return str(value).strip()
+
+            merge_source_columns = advanced.get('merge_columns') or []
+            if not isinstance(merge_source_columns, (list, tuple, set)):
+                merge_source_columns = []
+            merge_source_columns = {
+                int(c) for c in merge_source_columns
+                if str(c).strip().isdigit()
+            }
+            merge_positions = {
+                pos for pos, col_idx in enumerate(col_indexes)
+                if int(col_idx) in merge_source_columns
+            }
+
+            split_enabled = _adv_bool('split_enabled', False)
+            split_column = advanced.get('split_column')
+            try:
+                split_column = int(split_column)
+            except (TypeError, ValueError):
+                split_column = None
+
+            if split_enabled and split_column:
+                header_row = rows[0] if rows else []
+                grouped = []
+                group_by_key = {}
+                for excel_row in range(row_start + 1, row_end + 1):
+                    group_cell = _ExcelCellView(
+                        value_ws.cell(row=excel_row, column=split_column),
+                        ws.cell(row=excel_row, column=split_column),
+                    )
+                    key = _cell_display_text(group_cell) or '(Trống)'
+                    if key not in group_by_key:
+                        group_by_key[key] = []
+                        grouped.append((key, group_by_key[key]))
+                    group_by_key[key].append(rows[excel_row - row_start])
+
+                if not grouped:
+                    link_columns = _internal_link_positions(col_indexes, advanced)
+                    table_rows, table_merge_positions = _apply_auto_stt(
+                        rows, merge_positions, advanced
+                    )
+                    tbl = self._build_table_from_cell_rows(
+                        table_rows, preserve_inline,
+                        auto_merge_columns=table_merge_positions,
+                        internal_link_columns=link_columns,
+                    )
+                    if tbl is not None:
+                        elements.append(tbl)
+                        elements.append(self._create_empty_paragraph())
+                    return elements
+
+                add_heading = _adv_bool('add_split_heading', False)
+                prefix = str(advanced.get('heading_prefix', 'Bảng ') or '')
+                suffix = str(advanced.get('heading_suffix', '') or '')
+                parent_level = advanced.get('_parent_heading_level') or 1
+                try:
+                    heading_level = min(9, max(1, int(parent_level) + 1))
+                except (TypeError, ValueError):
+                    heading_level = 4
+                parent_number = str(advanced.get('_parent_heading_number') or '').strip()
+                try:
+                    split_heading_start_index = max(1, int(advanced.get('_split_heading_start_index') or 1))
+                except (TypeError, ValueError):
+                    split_heading_start_index = 1
+                heading_style = self._advanced_heading_style(advanced)
+
+                for group_idx, (group_key, data_rows) in enumerate(grouped, start=1):
+                    heading_idx = split_heading_start_index + group_idx - 1
+                    bookmark_name = ''
+                    if add_heading:
+                        heading_text = f'{prefix}{group_key}{suffix}'
+                        if parent_number:
+                            heading_text = f'{parent_number}.{heading_idx} {heading_text}'
+                        if _adv_bool_from(advanced, 'internal_link_enabled', False):
+                            bookmark_name = self._safe_bookmark_name('ILINK', group_key)
+                            advanced.setdefault('_internal_link_bookmarks', {})[
+                                self._normalize_internal_link_key(group_key)
+                            ] = bookmark_name
+                        elements.append(self._make_subheading_paragraph(
+                            heading_text, heading_level, heading_style, bookmark_name
+                        ))
+                    tbl_rows = [header_row] + data_rows if header_row else data_rows
+                    link_columns = _internal_link_positions(col_indexes, advanced)
+                    tbl_rows, table_merge_positions = _apply_auto_stt(
+                        tbl_rows, merge_positions, advanced
+                    )
+                    tbl = self._build_table_from_cell_rows(
+                        tbl_rows, preserve_inline,
+                        auto_merge_columns=table_merge_positions,
+                        internal_link_columns=link_columns,
+                    )
+                    if tbl is not None:
+                        elements.append(tbl)
+                        elements.extend(_lookup_text_paragraphs(group_key, advanced))
+                        elements.append(self._create_empty_paragraph())
+            else:
+                link_columns = _internal_link_positions(col_indexes, advanced)
+                table_rows, table_merge_positions = _apply_auto_stt(
+                    rows, merge_positions, advanced
+                )
+                tbl = self._build_table_from_cell_rows(
+                    table_rows, preserve_inline,
+                    auto_merge_columns=table_merge_positions,
+                    internal_link_columns=link_columns,
+                )
+                if tbl is not None:
+                    elements.append(tbl)
+                    elements.append(self._create_empty_paragraph())
         elif mode == 'custom':
             sheet_name = selection.get('sheet')
             cols_spec = (selection.get('columns') or '').strip()
@@ -1459,9 +3084,9 @@ class DocxModel:
             if not sheet_name or sheet_name not in wb.sheetnames:
                 raise ValueError(f'Sheet "{sheet_name}" không tồn tại trong file.')
             ws = wb[sheet_name]
+            value_ws = wb_values[sheet_name]
 
             max_col = ws.max_column or 1
-            max_row_in_sheet = ws.max_row or 1
 
             # Parse columns spec
             if cols_spec:
@@ -1472,19 +3097,158 @@ class DocxModel:
                 raise ValueError(f'Danh sách cột custom không hợp lệ: "{cols_spec}"')
 
             if row_end is None:
-                row_end = max_row_in_sheet
+                advanced_for_bounds = selection.get('advanced') or {}
+                if not isinstance(advanced_for_bounds, dict):
+                    advanced_for_bounds = {}
+                row_end = _effective_auto_row_end(
+                    ws, value_ws, row_start, col_indexes,
+                    [advanced_for_bounds.get('split_column')]
+                )
             row_end = max(row_start, row_end)
 
             # Build rows: lấy cell theo col_indexes × row range
             rows = []
             for r in range(row_start, row_end + 1):
-                row_cells = [ws.cell(row=r, column=c) for c in col_indexes]
+                row_cells = [_ExcelCellView(
+                    value_ws.cell(row=r, column=c),
+                    ws.cell(row=r, column=c),
+                ) for c in col_indexes]
                 rows.append(row_cells)
+            header_overrides = selection.get('header_overrides') or {}
+            if rows and isinstance(header_overrides, dict):
+                for pos, col_idx in enumerate(col_indexes):
+                    new_header = header_overrides.get(str(col_idx), header_overrides.get(col_idx))
+                    if new_header is None or pos >= len(rows[0]):
+                        continue
+                    try:
+                        rows[0][pos].value = str(new_header)
+                    except AttributeError:
+                        pass
 
-            tbl = self._build_table_from_cell_rows(rows, preserve_inline)
-            if tbl is not None:
-                elements.append(tbl)
-                elements.append(self._create_empty_paragraph())
+            advanced = selection.get('advanced') or {}
+            if not isinstance(advanced, dict):
+                advanced = {}
+
+            def _adv_bool(key, default=False):
+                value = advanced.get(key, default)
+                if isinstance(value, bool):
+                    return value
+                return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'y'}
+
+            def _cell_display_text(cell):
+                if cell is None or cell.value is None:
+                    return ''
+                value = cell.value
+                if hasattr(value, 'isoformat'):
+                    value = value.isoformat()
+                return str(value).strip()
+
+            merge_source_columns = advanced.get('merge_columns') or []
+            if not isinstance(merge_source_columns, (list, tuple, set)):
+                merge_source_columns = []
+            merge_source_columns = {
+                int(c) for c in merge_source_columns
+                if str(c).strip().isdigit()
+            }
+            merge_positions = {
+                pos for pos, col_idx in enumerate(col_indexes)
+                if int(col_idx) in merge_source_columns
+            }
+
+            split_enabled = _adv_bool('split_enabled', False)
+            split_column = advanced.get('split_column')
+            try:
+                split_column = int(split_column)
+            except (TypeError, ValueError):
+                split_column = None
+
+            if split_enabled and split_column:
+                header_row = rows[0] if rows else []
+                grouped = []
+                group_by_key = {}
+                for excel_row in range(row_start + 1, row_end + 1):
+                    group_cell = _ExcelCellView(
+                        value_ws.cell(row=excel_row, column=split_column),
+                        ws.cell(row=excel_row, column=split_column),
+                    )
+                    key = _cell_display_text(group_cell) or '(Trống)'
+                    if key not in group_by_key:
+                        group_by_key[key] = []
+                        grouped.append((key, group_by_key[key]))
+                    group_by_key[key].append(rows[excel_row - row_start])
+
+                if not grouped:
+                    link_columns = _internal_link_positions(col_indexes, advanced)
+                    table_rows, table_merge_positions = _apply_auto_stt(
+                        rows, merge_positions, advanced
+                    )
+                    tbl = self._build_table_from_cell_rows(
+                        table_rows, preserve_inline,
+                        auto_merge_columns=table_merge_positions,
+                        internal_link_columns=link_columns,
+                    )
+                    if tbl is not None:
+                        elements.append(tbl)
+                        elements.append(self._create_empty_paragraph())
+                    return elements
+
+                add_heading = _adv_bool('add_split_heading', False)
+                prefix = str(advanced.get('heading_prefix', 'Bảng ') or '')
+                suffix = str(advanced.get('heading_suffix', '') or '')
+                parent_level = advanced.get('_parent_heading_level') or 1
+                try:
+                    heading_level = min(9, max(1, int(parent_level) + 1))
+                except (TypeError, ValueError):
+                    heading_level = 4
+                parent_number = str(advanced.get('_parent_heading_number') or '').strip()
+                try:
+                    split_heading_start_index = max(1, int(advanced.get('_split_heading_start_index') or 1))
+                except (TypeError, ValueError):
+                    split_heading_start_index = 1
+                heading_style = self._advanced_heading_style(advanced)
+
+                for group_idx, (group_key, data_rows) in enumerate(grouped, start=1):
+                    heading_idx = split_heading_start_index + group_idx - 1
+                    bookmark_name = ''
+                    if add_heading:
+                        heading_text = f'{prefix}{group_key}{suffix}'
+                        if parent_number:
+                            heading_text = f'{parent_number}.{heading_idx} {heading_text}'
+                        if _adv_bool_from(advanced, 'internal_link_enabled', False):
+                            bookmark_name = self._safe_bookmark_name('ILINK', group_key)
+                            advanced.setdefault('_internal_link_bookmarks', {})[
+                                self._normalize_internal_link_key(group_key)
+                            ] = bookmark_name
+                        elements.append(self._make_subheading_paragraph(
+                            heading_text, heading_level, heading_style, bookmark_name
+                        ))
+                    tbl_rows = [header_row] + data_rows if header_row else data_rows
+                    link_columns = _internal_link_positions(col_indexes, advanced)
+                    tbl_rows, table_merge_positions = _apply_auto_stt(
+                        tbl_rows, merge_positions, advanced
+                    )
+                    tbl = self._build_table_from_cell_rows(
+                        tbl_rows, preserve_inline,
+                        auto_merge_columns=table_merge_positions,
+                        internal_link_columns=link_columns,
+                    )
+                    if tbl is not None:
+                        elements.append(tbl)
+                        elements.extend(_lookup_text_paragraphs(group_key, advanced))
+                        elements.append(self._create_empty_paragraph())
+            else:
+                link_columns = _internal_link_positions(col_indexes, advanced)
+                table_rows, table_merge_positions = _apply_auto_stt(
+                    rows, merge_positions, advanced
+                )
+                tbl = self._build_table_from_cell_rows(
+                    table_rows, preserve_inline,
+                    auto_merge_columns=table_merge_positions,
+                    internal_link_columns=link_columns,
+                )
+                if tbl is not None:
+                    elements.append(tbl)
+                    elements.append(self._create_empty_paragraph())
         else:
             raise ValueError(f'Mode không hợp lệ: {mode}')
 
@@ -1494,49 +3258,168 @@ class DocxModel:
         """Parse 'A,B,D-F,H' → list column indexes [1,2,4,5,6,8]."""
         return parse_excel_column_spec(spec)
 
-    def _extract_rows_from_range(self, ws, range_str):
+    def _extract_rows_from_range(self, ws, range_str, value_ws=None):
         """Trả về list of list of Cell từ ws[range_str]."""
+        def wrap(cell):
+            if cell is None or value_ws is None:
+                return cell
+            value_cell = value_ws.cell(row=cell.row, column=cell.column)
+
+            class _RangeCellView:
+                def __init__(self, value_cell, style_cell):
+                    self._value_cell = value_cell
+                    self._style_cell = style_cell
+                    self.row = getattr(style_cell, 'row', getattr(value_cell, 'row', None))
+                    self.column = getattr(style_cell, 'column', getattr(value_cell, 'column', None))
+                    self.parent = getattr(style_cell, 'parent', getattr(value_cell, 'parent', None))
+
+                @property
+                def value(self):
+                    return getattr(self._value_cell, 'value', None)
+
+                @value.setter
+                def value(self, value):
+                    self._value_cell.value = value
+
+                def __getattr__(self, name):
+                    return getattr(self._style_cell, name)
+
+            return _RangeCellView(value_cell, cell)
+
         try:
             sel = ws[range_str]
         except Exception as e:
             raise ValueError(f'Range "{range_str}" không hợp lệ: {e}')
         rows = []
         if hasattr(sel, 'value'):
-            rows = [[sel]]
+            rows = [[wrap(sel)]]
         elif isinstance(sel, tuple):
             if not sel:
                 return []
             if isinstance(sel[0], tuple):
-                rows = [list(r) for r in sel]
+                rows = [[wrap(cell) for cell in r] for r in sel]
             else:
-                rows = [list(sel)]
+                rows = [[wrap(cell) for cell in sel]]
         return rows
 
-    def _make_subheading_paragraph(self, text):
+    def _make_subheading_paragraph(self, text, level=4, style_override=None, bookmark_name=''):
         p = etree.Element(w('p'))
         pPr = etree.SubElement(p, w('pPr'))
         pStyle = etree.SubElement(pPr, w('pStyle'))
-        pStyle.set(w('val'), 'Heading4')
+        try:
+            level = min(9, max(1, int(level)))
+        except (TypeError, ValueError):
+            level = 4
+        pStyle.set(w('val'), f'Heading{level}')
         run = etree.SubElement(p, w('r'))
+        style_override = style_override if isinstance(style_override, dict) else {}
+        if style_override:
+            rpr = etree.SubElement(run, w('rPr'))
+            font = str(style_override.get('font') or '').strip()
+            if font:
+                rfonts = ensure_child(rpr, 'rFonts', RPR_ORDER)
+                for attr in ('ascii', 'hAnsi', 'eastAsia', 'cs'):
+                    rfonts.set(w(attr), font)
+            size_pt = style_override.get('size_pt')
+            try:
+                size_pt = float(size_pt) if size_pt not in (None, '') else 0
+            except (TypeError, ValueError):
+                size_pt = 0
+            if size_pt > 0:
+                size_val = str(pt_to_half_pt(size_pt))
+                ensure_child(rpr, 'sz', RPR_ORDER).set(w('val'), size_val)
+                ensure_child(rpr, 'szCs', RPR_ORDER).set(w('val'), size_val)
+            if style_override.get('bold'):
+                ensure_child(rpr, 'b', RPR_ORDER)
+                ensure_child(rpr, 'bCs', RPR_ORDER)
+            if style_override.get('italic'):
+                ensure_child(rpr, 'i', RPR_ORDER)
+                ensure_child(rpr, 'iCs', RPR_ORDER)
+            if style_override.get('underline'):
+                u = ensure_child(rpr, 'u', RPR_ORDER)
+                u.set(w('val'), 'single')
+            color = str(style_override.get('color') or '').strip().lstrip('#')
+            if re.fullmatch(r'[0-9A-Fa-f]{6}', color):
+                ensure_child(rpr, 'color', RPR_ORDER).set(w('val'), color.upper())
         t = etree.SubElement(run, w('t'))
         t.text = text
         t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+        if bookmark_name:
+            bookmark_id = str(abs(hash(bookmark_name)) % 2000000000)
+            self._insert_bookmark_start(p, bookmark_id, bookmark_name)
+            p.append(self._bookmark_end(bookmark_id))
         return p
 
-    def _build_table_from_cell_rows(self, rows, preserve_inline):
+    def _advanced_heading_style(self, advanced):
+        if not isinstance(advanced, dict):
+            return {}
+
+        def as_bool(value, default=False):
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return value
+            return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'y'}
+
+        style = {
+            'font': str(advanced.get('heading_font') or '').strip(),
+            'size_pt': advanced.get('heading_size_pt') or '',
+            'bold': as_bool(advanced.get('heading_bold'), False),
+            'italic': as_bool(advanced.get('heading_italic'), False),
+            'underline': as_bool(advanced.get('heading_underline'), False),
+            'color': str(advanced.get('heading_color') or '').strip(),
+        }
+        return {k: v for k, v in style.items() if v not in ('', None)}
+
+    def _build_table_from_cell_rows(
+            self, rows, preserve_inline, auto_merge_columns=None,
+            internal_link_columns=None):
         """Build <w:tbl> từ list of list of openpyxl Cell objects.
 
         Strategy: tính column widths dựa theo content length của từng cột,
         layout=fixed để Word không redistribute lại width khi render. Tổng width
         bám theo usable width của section chứa heading chèn bảng.
         """
-        def _text_of(cell):
+        def _decimal_places_from_number_format(fmt):
+            fmt = str(fmt or '').split(';')[0]
+            if not fmt or fmt.lower() == 'general':
+                return None
+            fmt = re.sub(r'"[^"]*"|\\.', '', fmt)
+            fmt = re.sub(r'\[[^\]]+\]', '', fmt)
+            if '.' not in fmt:
+                return 0
+            frac = fmt.split('.', 1)[1]
+            placeholders = re.match(r'[0#?]+', frac)
+            return len(placeholders.group(0)) if placeholders else 0
+
+        def _format_cell_value(cell):
             if cell is None or cell.value is None:
                 return ''
             value = cell.value
             if hasattr(value, 'isoformat'):
                 value = value.isoformat()
+            if isinstance(value, bool):
+                return str(value)
+            if isinstance(value, int):
+                return str(value)
+            if isinstance(value, float):
+                fmt = getattr(cell, 'number_format', '') or ''
+                decimals = _decimal_places_from_number_format(fmt)
+                percent_count = fmt.count('%')
+                display_value = value * (100 ** percent_count)
+                if decimals is not None:
+                    text = f'{display_value:.{decimals}f}'
+                elif display_value.is_integer():
+                    text = str(int(display_value))
+                else:
+                    text = f'{display_value:.15g}'
+                if percent_count:
+                    text += '%' * percent_count
+                return text
             return str(value)
+
+        def _text_of(cell):
+            return _format_cell_value(cell)
 
         def _excel_horizontal_to_word(value):
             mapping = {
@@ -1594,6 +3477,97 @@ class DocxModel:
         ncols = max(len(row) for row in rows)
         if ncols == 0:
             return None
+        merge_info = {}
+        position_by_coord = {}
+        worksheet = None
+        for rr, row in enumerate(rows):
+            for cc, cell in enumerate(row):
+                if cell is None:
+                    continue
+                worksheet = getattr(cell, 'parent', worksheet)
+                position_by_coord[(getattr(cell, 'row', None), getattr(cell, 'column', None))] = (rr, cc)
+
+        if worksheet is not None and getattr(worksheet, 'merged_cells', None) is not None:
+            for merged_range in worksheet.merged_cells.ranges:
+                positions = []
+                for rr, row in enumerate(rows):
+                    for cc, cell in enumerate(row):
+                        if cell is None:
+                            continue
+                        cell_row = getattr(cell, 'row', None)
+                        cell_col = getattr(cell, 'column', None)
+                        if (merged_range.min_row <= cell_row <= merged_range.max_row and
+                                merged_range.min_col <= cell_col <= merged_range.max_col):
+                            positions.append((rr, cc))
+                if len(positions) <= 1:
+                    continue
+                row_indexes = sorted({p[0] for p in positions})
+                col_indexes = sorted({p[1] for p in positions})
+                if (row_indexes != list(range(row_indexes[0], row_indexes[-1] + 1)) or
+                        col_indexes != list(range(col_indexes[0], col_indexes[-1] + 1))):
+                    continue
+                if len(positions) != len(row_indexes) * len(col_indexes):
+                    continue
+
+                master_pos = position_by_coord.get((merged_range.min_row, merged_range.min_col))
+                master_cell = rows[master_pos[0]][master_pos[1]] if master_pos is not None else None
+                top_row, left_col = row_indexes[0], col_indexes[0]
+                rowspan, colspan = len(row_indexes), len(col_indexes)
+                for rr in row_indexes:
+                    for cc in col_indexes:
+                        if rr == top_row and cc == left_col:
+                            merge_info[(rr, cc)] = {
+                                'role': 'restart',
+                                'rowspan': rowspan,
+                                'colspan': colspan,
+                                'master_cell': master_cell,
+                            }
+                        elif cc == left_col:
+                            merge_info[(rr, cc)] = {
+                                'role': 'continue',
+                                'rowspan': rowspan,
+                                'colspan': colspan,
+                                'master_cell': master_cell,
+                            }
+                        else:
+                            merge_info[(rr, cc)] = {'role': 'skip'}
+
+        auto_merge_columns = {
+            int(c) for c in (auto_merge_columns or set())
+            if str(c).strip().isdigit() and 0 <= int(c) < ncols
+        }
+        if auto_merge_columns and len(rows) > 2:
+            for c_idx in sorted(auto_merge_columns):
+                r_idx = 1
+                while r_idx < len(rows):
+                    cell = rows[r_idx][c_idx] if c_idx < len(rows[r_idx]) else None
+                    value = _text_of(cell).strip()
+                    if not value or (r_idx, c_idx) in merge_info:
+                        r_idx += 1
+                        continue
+                    end_idx = r_idx + 1
+                    while end_idx < len(rows):
+                        next_cell = rows[end_idx][c_idx] if c_idx < len(rows[end_idx]) else None
+                        if _text_of(next_cell).strip() != value or (end_idx, c_idx) in merge_info:
+                            break
+                        end_idx += 1
+                    if end_idx - r_idx > 1:
+                        group_positions = [(rr, c_idx) for rr in range(r_idx, end_idx)]
+                        if not any(pos in merge_info for pos in group_positions):
+                            merge_info[(r_idx, c_idx)] = {
+                                'role': 'restart',
+                                'rowspan': end_idx - r_idx,
+                                'colspan': 1,
+                                'master_cell': cell,
+                            }
+                            for rr in range(r_idx + 1, end_idx):
+                                merge_info[(rr, c_idx)] = {
+                                    'role': 'continue',
+                                    'rowspan': end_idx - r_idx,
+                                    'colspan': 1,
+                                    'master_cell': cell,
+                                }
+                    r_idx = max(end_idx, r_idx + 1)
 
         # ---- Tính column widths theo header + content ----
         # Nếu chỉ dùng len(cell text), cột mô tả dài sẽ nuốt width, còn header
@@ -1854,13 +3828,27 @@ class DocxModel:
                 trPr = etree.SubElement(tr, w('trPr'))
                 etree.SubElement(trPr, w('tblHeader'))
             for c_idx in range(ncols):
+                merge = merge_info.get((r_idx, c_idx), {})
+                if merge.get('role') == 'skip':
+                    continue
                 cell = row[c_idx] if c_idx < len(row) else None
+                effective_cell = merge.get('master_cell') or cell
+                colspan = int(merge.get('colspan') or 1)
+                is_vmerge = int(merge.get('rowspan') or 1) > 1
+                is_vmerge_continue = merge.get('role') == 'continue'
                 tc = etree.SubElement(tr, w('tc'))
 
                 tcPr = etree.SubElement(tc, w('tcPr'))
                 tcW = etree.SubElement(tcPr, w('tcW'))
-                tcW.set(w('w'), str(col_widths[c_idx]))
+                tcW.set(w('w'), str(sum(col_widths[c_idx:c_idx + colspan])))
                 tcW.set(w('type'), 'dxa')
+                if colspan > 1:
+                    grid_span = etree.SubElement(tcPr, w('gridSpan'))
+                    grid_span.set(w('val'), str(colspan))
+                if is_vmerge:
+                    v_merge = etree.SubElement(tcPr, w('vMerge'))
+                    if not is_vmerge_continue:
+                        v_merge.set(w('val'), 'restart')
 
                 if c_idx in no_wrap_cols:
                     noWrap = etree.SubElement(tcPr, w('noWrap'))
@@ -1877,7 +3865,7 @@ class DocxModel:
                     m.set(w('type'), 'dxa')
 
                 vAlign = etree.SubElement(tcPr, w('vAlign'))
-                vAlign.set(w('val'), _cell_vertical_alignment(cell, r_idx))
+                vAlign.set(w('val'), _cell_vertical_alignment(effective_cell, r_idx))
 
                 p = etree.SubElement(tc, w('p'))
                 pPr = etree.SubElement(p, w('pPr'))
@@ -1898,12 +3886,10 @@ class DocxModel:
                 ind.set(w('firstLine'), '0')
                 ind.set(w('hanging'), '0')
                 jc = ensure_child(pPr, 'jc', PPR_ORDER)
-                jc.set(w('val'), _cell_horizontal_alignment(cell, r_idx, c_idx))
+                jc.set(w('val'), _cell_horizontal_alignment(effective_cell, r_idx, c_idx))
                 if c_idx in no_wrap_cols:
                     wordWrap = ensure_child(pPr, 'wordWrap', PPR_ORDER)
                     wordWrap.set(w('val'), '0')
-
-                run = etree.SubElement(p, w('r'))
 
                 # rPr: luôn có (ép font/size)
                 rpr = etree.Element(w('rPr'))
@@ -1913,10 +3899,10 @@ class DocxModel:
                 rfonts.set(w('eastAsia'), ov_font)
                 rfonts.set(w('cs'), ov_font)
 
-                if preserve_inline and cell is not None and cell.font:
-                    if cell.font.bold:
+                if preserve_inline and effective_cell is not None and effective_cell.font:
+                    if effective_cell.font.bold:
                         ensure_child(rpr, 'b', RPR_ORDER)
-                    if cell.font.italic:
+                    if effective_cell.font.italic:
                         ensure_child(rpr, 'i', RPR_ORDER)
 
                 sz = ensure_child(rpr, 'sz', RPR_ORDER)
@@ -1924,21 +3910,111 @@ class DocxModel:
                 szcs = ensure_child(rpr, 'szCs', RPR_ORDER)
                 szcs.set(w('val'), str(int(round(ov_size * 2))))
 
-                if preserve_inline and cell is not None and cell.font:
-                    if cell.font.underline and cell.font.underline != 'none':
+                if preserve_inline and effective_cell is not None and effective_cell.font:
+                    if effective_cell.font.underline and effective_cell.font.underline != 'none':
                         u = ensure_child(rpr, 'u', RPR_ORDER)
                         u.set(w('val'), 'single')
 
-                run.append(rpr)
+                text_value = '' if is_vmerge_continue else _format_cell_value(effective_cell)
+                hyperlink = getattr(effective_cell, 'hyperlink', None) if effective_cell is not None else None
+                hyperlink_target = ''
+                if hyperlink is not None:
+                    hyperlink_target = getattr(hyperlink, 'target', None) or ''
+                    if not hyperlink_target and getattr(hyperlink, 'location', None):
+                        hyperlink_target = '#' + str(hyperlink.location)
 
-                value = cell.value if cell is not None and cell.value is not None else ''
-                if hasattr(value, 'isoformat'):
-                    value = value.isoformat()
-                t = etree.SubElement(run, w('t'))
-                t.text = str(value)
-                t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+                internal_bookmark = ''
+                link_map = (internal_link_columns or {}).get(c_idx) or {}
+                if link_map and text_value:
+                    internal_bookmark = link_map.get(self._normalize_internal_link_key(text_value), '')
+
+                if internal_bookmark:
+                    self._append_internal_hyperlink_run(p, text_value, internal_bookmark, rpr)
+                elif self._is_external_web_hyperlink(hyperlink_target):
+                    self._append_field_hyperlink_runs(p, text_value, hyperlink_target, rpr)
+                else:
+                    run = etree.SubElement(p, w('r'))
+                    if hyperlink_target:
+                        rpr = self._rpr_without_hyperlink_decoration(rpr)
+                    run.append(rpr)
+                    t = etree.SubElement(run, w('t'))
+                    t.text = text_value
+                    t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
 
         return tbl
+
+    def _is_external_web_hyperlink(self, target):
+        """Only keep real website hyperlinks; workbook-local links become plain text."""
+        value = str(target or '').strip()
+        if not value:
+            return False
+        lower = value.lower()
+        if lower.startswith(('#', 'sheet', "'")):
+            return False
+        if lower.startswith(('http://', 'https://')):
+            return True
+        if lower.startswith('www.'):
+            return True
+        return False
+
+    def _rpr_without_hyperlink_decoration(self, rpr):
+        clean = etree.fromstring(etree.tostring(rpr))
+        for tag in ('u', 'color'):
+            child = clean.find(w(tag))
+            if child is not None:
+                clean.remove(child)
+        return clean
+
+    def _normalize_internal_link_key(self, value):
+        text = normalize_match_text(value)
+        text = re.sub(r'^\d+(?:\.\d+)*\.?\s+', '', text)
+        text = re.sub(r'^(BANG|TABLE)\s+', '', text)
+        return re.sub(r'\s+', ' ', text).strip()
+
+    def _append_internal_hyperlink_run(self, paragraph, display_text, bookmark_name, base_rpr):
+        hyperlink = etree.SubElement(paragraph, w('hyperlink'))
+        hyperlink.set(w('anchor'), bookmark_name)
+        hyperlink.set(w('history'), '1')
+        run = etree.SubElement(hyperlink, w('r'))
+        link_rpr = etree.fromstring(etree.tostring(base_rpr))
+        color = ensure_child(link_rpr, 'color', RPR_ORDER)
+        color.set(w('val'), '0563C1')
+        underline = ensure_child(link_rpr, 'u', RPR_ORDER)
+        underline.set(w('val'), 'single')
+        run.append(link_rpr)
+        t = etree.SubElement(run, w('t'))
+        t.text = display_text
+        t.set(XML_SPACE, 'preserve')
+
+    def _append_field_hyperlink_runs(self, paragraph, display_text, target, base_rpr):
+        """Append a Word HYPERLINK field without creating document relationships."""
+        def add_fld_char(kind):
+            run = etree.SubElement(paragraph, w('r'))
+            fld = etree.SubElement(run, w('fldChar'))
+            fld.set(w('fldCharType'), kind)
+
+        add_fld_char('begin')
+
+        instr_run = etree.SubElement(paragraph, w('r'))
+        instr = etree.SubElement(instr_run, w('instrText'))
+        instr.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+        safe_target = str(target).replace('\\', '\\\\').replace('"', '\\"')
+        instr.text = f' HYPERLINK "{safe_target}" '
+
+        add_fld_char('separate')
+
+        text_run = etree.SubElement(paragraph, w('r'))
+        link_rpr = etree.fromstring(etree.tostring(base_rpr))
+        color = ensure_child(link_rpr, 'color', RPR_ORDER)
+        color.set(w('val'), '0563C1')
+        underline = ensure_child(link_rpr, 'u', RPR_ORDER)
+        underline.set(w('val'), 'single')
+        text_run.append(link_rpr)
+        t = etree.SubElement(text_run, w('t'))
+        t.text = display_text
+        t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+
+        add_fld_char('end')
 
     def _set_paragraph_text(self, p, text):
         """Xoá hết các run hiện tại trong paragraph rồi thêm 1 run mới với text mới.
@@ -2275,11 +4351,26 @@ class ExcelSelectionDialog:
         max_scan, max_col = self._nonempty_bounds_in_scan(ws)
         best_row = 1
         best_score = -1
+        keywords = {
+            'stt', 'ma', 'ten', 'mo ta', 'tan suat', 'loai', 'nguon', 'dich',
+            'bang', 'cot', 'field', 'table', 'column', 'name', 'description',
+            'key', 'type',
+        }
+
+        def normalize_header_text(value):
+            text = str(value or '').strip().lower()
+            text = ''.join(
+                ch for ch in unicodedata.normalize('NFKD', text)
+                if not unicodedata.combining(ch)
+            )
+            return re.sub(r'\s+', ' ', text)
+
         for r in range(1, max_scan + 1):
             nonempty = 0
             text_cells = 0
             numeric_cells = 0
-            total_text_len = 0
+            short_text_cells = 0
+            header_keyword_hits = 0
             for c in range(1, max_col + 1):
                 v = ws.cell(row=r, column=c).value
                 if v is None or str(v).strip() == '':
@@ -2289,10 +4380,21 @@ class ExcelSelectionDialog:
                     numeric_cells += 1
                 else:
                     text_cells += 1
-                    total_text_len += min(len(str(v).strip()), 40)
+                    text = normalize_header_text(v)
+                    if len(text) <= 28:
+                        short_text_cells += 1
+                    if any(k in text for k in keywords):
+                        header_keyword_hits += 1
             if nonempty < 2:
                 continue
-            score = nonempty * 10 + text_cells * 6 + total_text_len - numeric_cells * 8
+            score = (
+                nonempty * 16
+                + text_cells * 8
+                + short_text_cells * 5
+                + header_keyword_hits * 35
+                - numeric_cells * 18
+                - r * 2
+            )
             if score > best_score:
                 best_score = score
                 best_row = r
@@ -2667,7 +4769,7 @@ class WizardApp:
         self.root.title('DOCX Template Builder')
         self.root.geometry('1100x780')
 
-        # Notebook (tabs cho 7 bước)
+        # Notebook (tabs cho 8 bước)
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
 
@@ -2678,6 +4780,7 @@ class WizardApp:
         self.tab_step5 = ttk.Frame(self.notebook)
         self.tab_step6 = ttk.Frame(self.notebook)
         self.tab_step7 = ttk.Frame(self.notebook)
+        self.tab_step8 = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_step1, text='1. Chọn file & trang')
         self.notebook.add(self.tab_step2, text='2. Defaults & Sections')
@@ -2685,10 +4788,11 @@ class WizardApp:
         self.notebook.add(self.tab_step4, text='4. Headings/Numbering/H&F')
         self.notebook.add(self.tab_step5, text='5. Danh sách heading')
         self.notebook.add(self.tab_step6, text='6. Giữ/xoá nội dung')
-        self.notebook.add(self.tab_step7, text='7. Lưu template')
+        self.notebook.add(self.tab_step7, text='7. Mục lục')
+        self.notebook.add(self.tab_step8, text='8. Lưu template')
 
         # Disable các tab sau cho tới khi load file
-        for i in range(1, 7):
+        for i in range(1, 8):
             self.notebook.tab(i, state='disabled')
 
         self._build_step1()
@@ -2698,6 +4802,7 @@ class WizardApp:
         self._build_step5_placeholder()
         self._build_step6_placeholder()
         self._build_step7_placeholder()
+        self._build_step8_placeholder()
 
     def run(self):
         self.root.mainloop()
@@ -2802,7 +4907,7 @@ class WizardApp:
             self._populate_intro_tree()
 
             # Enable các tab khác
-            for i in range(1, 7):
+            for i in range(1, 8):
                 self.notebook.tab(i, state='normal')
         except Exception as e:
             import traceback
@@ -2872,6 +4977,7 @@ class WizardApp:
         self._build_step5()
         self._build_step6()
         self._build_step7()
+        self._build_step8()
         self.notebook.select(1)
 
     # -------------------------------------------------------------------
@@ -3391,12 +5497,53 @@ class WizardApp:
         if not sel:
             return
         idx = int(sel[0])
-        new_idx = idx + direction
         lst = self.model.config['headings_list']
-        if 0 <= new_idx < len(lst):
-            lst[idx], lst[new_idx] = lst[new_idx], lst[idx]
-            self._refresh_heading_tree()
-            self.h_tree.selection_set(str(new_idx))
+        block_end = self._heading_block_end(idx)
+        block = lst[idx:block_end]
+        new_idx = idx
+        if direction < 0:
+            prev_start = self._previous_sibling_heading_block_start(idx)
+            if prev_start < 0:
+                return
+            del lst[idx:block_end]
+            lst[prev_start:prev_start] = block
+            new_idx = prev_start
+        else:
+            if block_end >= len(lst):
+                return
+            base_level = int(lst[idx].get('level') or 1)
+            next_level = int(lst[block_end].get('level') or 1)
+            if next_level < base_level:
+                return
+            next_end = self._heading_block_end(block_end)
+            del lst[idx:block_end]
+            insert_at = next_end - len(block)
+            lst[insert_at:insert_at] = block
+            new_idx = insert_at
+        self._refresh_heading_tree()
+        self.h_tree.selection_set(str(new_idx))
+
+    def _heading_block_end(self, start_idx):
+        lst = self.model.config['headings_list']
+        if not (0 <= start_idx < len(lst)):
+            return start_idx
+        base_level = int(lst[start_idx].get('level') or 1)
+        end_idx = start_idx + 1
+        while end_idx < len(lst) and int(lst[end_idx].get('level') or 1) > base_level:
+            end_idx += 1
+        return end_idx
+
+    def _previous_sibling_heading_block_start(self, start_idx):
+        lst = self.model.config['headings_list']
+        if not (0 <= start_idx < len(lst)):
+            return -1
+        base_level = int(lst[start_idx].get('level') or 1)
+        j = start_idx - 1
+        while j >= 0 and int(lst[j].get('level') or 1) > base_level:
+            j -= 1
+        if j < 0 or int(lst[j].get('level') or 1) < base_level:
+            return -1
+        return j
 
     def _save_step5(self):
         # Cập nhật flag auto_number cho mọi entry
@@ -3489,6 +5636,9 @@ class WizardApp:
                 action = 'insert'
             else:
                 action = 'empty'
+            if action != 'insert':
+                h['insert_source'] = None
+                h['insert_selection'] = None
 
             action_var = tk.StringVar(value=action)
             action_combo = ttk.Combobox(
@@ -3522,12 +5672,16 @@ class WizardApp:
                       foreground='#333').pack(side='left', padx=10)
 
             # Show/hide source widgets based on action
-            def update_visibility(*_, ac=action_combo, se=source_entry, bb=browse_btn):
+            def update_visibility(*_, ac=action_combo, se=source_entry, bb=browse_btn, sv=source_var, idx=i):
                 txt = ac.get()
                 if txt.startswith('insert'):
                     se.config(state='readonly')
                     bb.config(state='normal')
                 else:
+                    heading = self.model.config['headings_list'][idx]
+                    heading['insert_source'] = None
+                    heading['insert_selection'] = None
+                    sv.set('')
                     se.config(state='disabled')
                     bb.config(state='disabled')
             action_combo.bind('<<ComboboxSelected>>', update_visibility)
@@ -3614,6 +5768,8 @@ class WizardApp:
             h = self.model.config['headings_list'][i]
             if txt.startswith('keep'):
                 h['keep_content'] = True
+                h['insert_source'] = None
+                h['insert_selection'] = None
             elif txt.startswith('empty'):
                 h['keep_content'] = False
                 h['insert_source'] = None
@@ -3656,7 +5812,7 @@ class WizardApp:
             var.set(path)
 
     # -------------------------------------------------------------------
-    # STEP 7: Lưu template
+    # STEP 7: Style mục lục
     # -------------------------------------------------------------------
 
     def _build_step7_placeholder(self):
@@ -3667,7 +5823,147 @@ class WizardApp:
         for child in f.winfo_children():
             child.destroy()
 
-        ttk.Label(f, text='Bước 7: Tổng kết & lưu template',
+        self.model._ensure_toc_settings_defaults()
+        cfg = self.model.config['toc_settings']
+
+        ttk.Label(f, text='Bước 7: Cấu hình style mục lục (TOC)',
+                  font=('Segoe UI', 12, 'bold')).pack(anchor='w', pady=(10, 5), padx=10)
+        ttk.Label(
+            f,
+            text='Các setting này sẽ ghi vào style TOC1..TOC9. Khi sinh file, tool đánh dấu mục lục để Word cập nhật lại số trang và render theo style mới.',
+            foreground='gray',
+            wraplength=980,
+            justify='left'
+        ).pack(anchor='w', padx=10, pady=2)
+
+        top = ttk.LabelFrame(f, text='Thiết lập chung')
+        top.pack(fill='x', padx=10, pady=6)
+
+        self.toc_enabled_var = tk.BooleanVar(value=cfg.get('enabled', True))
+        self.toc_update_var = tk.BooleanVar(value=cfg.get('update_on_open', True))
+        ttk.Checkbutton(top, text='Áp dụng style TOC khi sinh file', variable=self.toc_enabled_var)\
+            .grid(row=0, column=0, sticky='w', padx=5, pady=3)
+        ttk.Checkbutton(top, text='Cập nhật mục lục khi mở file bằng Word', variable=self.toc_update_var)\
+            .grid(row=0, column=1, sticky='w', padx=5, pady=3)
+
+        ttk.Label(top, text='Lấy heading level:').grid(row=1, column=0, sticky='w', padx=5, pady=3)
+        self.toc_levels_var = tk.StringVar(value=str(cfg.get('levels', 4)))
+        ttk.Combobox(top, textvariable=self.toc_levels_var, values=[str(i) for i in range(1, 10)],
+                     width=6, state='readonly').grid(row=1, column=0, sticky='w', padx=(120, 5), pady=3)
+
+        ttk.Label(top, text='Tab leader số trang:').grid(row=1, column=1, sticky='w', padx=5, pady=3)
+        self.toc_leader_var = tk.StringVar(value=cfg.get('tab_leader', 'none'))
+        ttk.Combobox(top, textvariable=self.toc_leader_var,
+                     values=['none', 'dot', 'hyphen', 'underscore'],
+                     width=12, state='readonly').grid(row=1, column=1, sticky='w', padx=(140, 5), pady=3)
+
+        ttk.Label(top, text='Right tab (cm):').grid(row=1, column=2, sticky='w', padx=5, pady=3)
+        self.toc_right_tab_var = tk.StringVar(value=str(cfg.get('right_tab_cm', 0) or 0))
+        ttk.Entry(top, textvariable=self.toc_right_tab_var, width=8)\
+            .grid(row=1, column=2, sticky='w', padx=(95, 5), pady=3)
+        ttk.Label(top, text='0 = tự tính theo lề trang', foreground='gray')\
+            .grid(row=1, column=3, sticky='w', padx=5, pady=3)
+
+        style_frame = ttk.LabelFrame(f, text='TOC styles')
+        style_frame.pack(fill='both', expand=True, padx=10, pady=5)
+
+        header = ttk.Frame(style_frame)
+        header.pack(fill='x', padx=5, pady=(4, 2))
+        cols = [
+            ('Style', 8), ('Font', 18), ('Size', 7), ('Bold', 6),
+            ('Indent cm', 9), ('Text tab cm', 10),
+            ('Before', 7), ('After', 7), ('Line', 7),
+        ]
+        for text, width in cols:
+            ttk.Label(header, text=text, width=width, font=('Segoe UI', 9, 'bold')).pack(side='left', padx=2)
+
+        container = ttk.Frame(style_frame)
+        container.pack(fill='both', expand=True, padx=5, pady=2)
+        canvas = tk.Canvas(container, height=320)
+        scrollbar = ttk.Scrollbar(container, orient='vertical', command=canvas.yview)
+        scrollable = ttk.Frame(canvas)
+        scrollable.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=scrollable, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+
+        self.toc_style_widgets = []
+        for sid, data in cfg.get('styles', {}).items():
+            row = ttk.Frame(scrollable)
+            row.pack(fill='x', padx=2, pady=2)
+            ttk.Label(row, text=sid, width=8).pack(side='left', padx=2)
+
+            font_var = tk.StringVar(value=str(data.get('font', 'Times New Roman')))
+            size_var = tk.StringVar(value=str(data.get('size_pt', 13)))
+            bold_var = tk.BooleanVar(value=bool(data.get('bold', False)))
+            left_var = tk.StringVar(value=str(data.get('left_indent_cm', 0)))
+            tab_var = tk.StringVar(value=str(data.get('text_tab_cm', 0)))
+            before_var = tk.StringVar(value=str(data.get('space_before_pt', 0)))
+            after_var = tk.StringVar(value=str(data.get('space_after_pt', 0)))
+            line_var = tk.StringVar(value=str(data.get('line_spacing', '1.15')))
+
+            ttk.Entry(row, textvariable=font_var, width=18).pack(side='left', padx=2)
+            ttk.Entry(row, textvariable=size_var, width=7).pack(side='left', padx=2)
+            ttk.Checkbutton(row, variable=bold_var, width=5).pack(side='left', padx=2)
+            ttk.Entry(row, textvariable=left_var, width=9).pack(side='left', padx=2)
+            ttk.Entry(row, textvariable=tab_var, width=10).pack(side='left', padx=2)
+            ttk.Entry(row, textvariable=before_var, width=7).pack(side='left', padx=2)
+            ttk.Entry(row, textvariable=after_var, width=7).pack(side='left', padx=2)
+            ttk.Entry(row, textvariable=line_var, width=7).pack(side='left', padx=2)
+
+            self.toc_style_widgets.append({
+                'sid': sid,
+                'font': font_var,
+                'size_pt': size_var,
+                'bold': bold_var,
+                'left_indent_cm': left_var,
+                'text_tab_cm': tab_var,
+                'space_before_pt': before_var,
+                'space_after_pt': after_var,
+                'line_spacing': line_var,
+            })
+
+        ttk.Button(f, text='Lưu & sang bước 8 →',
+                   command=self._save_step7_and_go).pack(anchor='e', padx=10, pady=10)
+
+    def _save_step7_and_go(self):
+        cfg = self.model._ensure_toc_settings_defaults()
+        cfg['enabled'] = self.toc_enabled_var.get()
+        cfg['update_on_open'] = self.toc_update_var.get()
+        try:
+            cfg['levels'] = max(1, min(9, int(self.toc_levels_var.get())))
+            cfg['right_tab_cm'] = float(self.toc_right_tab_var.get().strip() or 0)
+            for row in self.toc_style_widgets:
+                sid = row['sid']
+                cfg['styles'][sid]['font'] = row['font'].get().strip() or 'Times New Roman'
+                cfg['styles'][sid]['size_pt'] = float(row['size_pt'].get())
+                cfg['styles'][sid]['bold'] = row['bold'].get()
+                cfg['styles'][sid]['left_indent_cm'] = float(row['left_indent_cm'].get())
+                cfg['styles'][sid]['text_tab_cm'] = float(row['text_tab_cm'].get())
+                cfg['styles'][sid]['space_before_pt'] = float(row['space_before_pt'].get())
+                cfg['styles'][sid]['space_after_pt'] = float(row['space_after_pt'].get())
+                cfg['styles'][sid]['line_spacing'] = row['line_spacing'].get().strip() or '1.15'
+        except ValueError:
+            messagebox.showerror('Lỗi', 'Một giá trị TOC không hợp lệ. Vui lòng kiểm tra số pt/cm/line spacing.')
+            return
+        cfg['tab_leader'] = self.toc_leader_var.get().strip() or 'none'
+        self._build_step8()
+        self.notebook.select(7)
+
+    # -------------------------------------------------------------------
+    # STEP 8: Lưu template
+    # -------------------------------------------------------------------
+
+    def _build_step8_placeholder(self):
+        ttk.Label(self.tab_step8, text='Hoàn tất bước 1 trước').pack(pady=20)
+
+    def _build_step8(self):
+        f = self.tab_step8
+        for child in f.winfo_children():
+            child.destroy()
+
+        ttk.Label(f, text='Bước 8: Tổng kết & lưu template',
                   font=('Segoe UI', 12, 'bold')).pack(anchor='w', pady=(10, 5), padx=10)
 
         # Summary
@@ -3788,6 +6084,17 @@ class WizardApp:
             lines.append(f'  {sid}: font={data.get("font")} {data.get("size_pt")}pt '
                          f'bold={data.get("bold")} italic={data.get("italic")}')
         lines.append('')
+        toc = c.get('toc_settings') or {}
+        lines.append('=== TOC styles ===')
+        lines.append(f'  enabled={toc.get("enabled", True)} '
+                     f'update_on_open={toc.get("update_on_open", True)} '
+                     f'levels=1-{toc.get("levels", 4)} '
+                     f'leader={toc.get("tab_leader", "none")}')
+        for sid, data in list((toc.get('styles') or {}).items())[:4]:
+            lines.append(f'  {sid}: font={data.get("font")} {data.get("size_pt")}pt '
+                         f'bold={data.get("bold")} indent={data.get("left_indent_cm")}cm '
+                         f'text_tab={data.get("text_tab_cm")}cm line={data.get("line_spacing")}')
+        lines.append('')
         lines.append(f'=== Text replacements: {len(c["intro_replacements"])} ===')
         for old, new in list(c['intro_replacements'].items())[:5]:
             lines.append(f'  "{old[:40]}" → "{new[:40]}"')
@@ -3838,13 +6145,91 @@ class WizardApp:
 # Main
 # ============================================================================
 
+class ToolLauncherApp:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title('Chon tool')
+        self.root.geometry('720x360')
+        self.root.minsize(640, 320)
+        self._build()
+
+    def run(self):
+        self.root.mainloop()
+
+    def _build(self):
+        outer = ttk.Frame(self.root, padding=24)
+        outer.pack(fill='both', expand=True)
+
+        ttk.Label(
+            outer,
+            text='Chon tool can su dung',
+            font=('Segoe UI', 16, 'bold')
+        ).pack(anchor='w')
+        ttk.Label(
+            outer,
+            text='Moi tool se mo giao dien va luong xu ly rieng.',
+            font=('Segoe UI', 10)
+        ).pack(anchor='w', pady=(4, 18))
+
+        cards = ttk.Frame(outer)
+        cards.pack(fill='both', expand=True)
+        cards.columnconfigure(0, weight=1)
+        cards.columnconfigure(1, weight=1)
+
+        self._tool_card(
+            cards,
+            column=0,
+            title='DOCX Template Builder',
+            desc='Tool hien tai: doc file Word mau, chinh cau hinh va sinh file template .docx.',
+            button='Mo tool template',
+            command=self._open_template_tool,
+        )
+        self._tool_card(
+            cards,
+            column=1,
+            title='CSDL -> Excel',
+            desc='Mini tool moi: doc mo ta thiet ke CSDL tu file .docx va sinh Excel cau truc.',
+            button='Mo tool CSDL',
+            command=self._open_csdl_tool,
+        )
+
+    def _tool_card(self, parent, column, title, desc, button, command):
+        frame = ttk.LabelFrame(parent, text=title, padding=16)
+        frame.grid(row=0, column=column, sticky='nsew', padx=(0, 8) if column == 0 else (8, 0))
+        frame.rowconfigure(1, weight=1)
+
+        ttk.Label(frame, text=title, font=('Segoe UI', 12, 'bold')).grid(row=0, column=0, sticky='w')
+        ttk.Label(
+            frame,
+            text=desc,
+            wraplength=280,
+            justify='left'
+        ).grid(row=1, column=0, sticky='nw', pady=(8, 18))
+        ttk.Button(frame, text=button, command=command).grid(row=2, column=0, sticky='e')
+
+    def _open_template_tool(self):
+        self.root.destroy()
+        app = WizardApp()
+        app.run()
+
+    def _open_csdl_tool(self):
+        try:
+            import tk_csdl_tool
+        except Exception as exc:
+            messagebox.showerror('Loi mo tool CSDL', str(exc))
+            return
+
+        self.root.destroy()
+        tk_csdl_tool.launch_gui()
+
+
 def main():
     if tk is None:
         raise RuntimeError(
             'Không tìm thấy Tkinter. Dùng web_app.py cho bản web/server, '
             'hoặc cài Python có Tk để chạy GUI desktop.'
         )
-    app = WizardApp()
+    app = ToolLauncherApp()
     app.run()
 
 

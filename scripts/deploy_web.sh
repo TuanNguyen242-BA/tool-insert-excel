@@ -5,7 +5,7 @@ set -euo pipefail
 
 REGION="${REGION:-asia-southeast1}"
 BUCKET="${BUCKET:-${PROJECT_ID}-docx-builder}"
-WEB_SERVICE="${WEB_SERVICE:-tool-insert-excel-web}"
+WEB_SERVICE="${WEB_SERVICE:-solutionhub}"
 WORKER_JOB_NAME="${WORKER_JOB_NAME:-tool-insert-excel-worker}"
 WEB_SA="${WEB_SA:-docx-web-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
 FIRESTORE_JOBS_COLLECTION="${FIRESTORE_JOBS_COLLECTION:-docx_jobs}"
@@ -14,13 +14,19 @@ MIN_INSTANCES="${MIN_INSTANCES:-1}"
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
 IMAGE="${IMAGE:-${REGION}-docker.pkg.dev/${PROJECT_ID}/tool-insert-excel/app:latest}"
 
-if ! command -v "$GCLOUD_BIN" >/dev/null 2>&1; then
-  if [ -x "/opt/homebrew/share/google-cloud-sdk/bin/gcloud" ]; then
-    GCLOUD_BIN="/opt/homebrew/share/google-cloud-sdk/bin/gcloud"
-  else
-    echo "Khong tim thay gcloud. Hay cai Google Cloud CLI hoac set GCLOUD_BIN=/duong/dan/gcloud" >&2
-    exit 1
-  fi
+if command -v "$GCLOUD_BIN" >/dev/null 2>&1; then
+  :
+elif [ -f "$GCLOUD_BIN" ]; then
+  :
+elif [ -x "/opt/homebrew/share/google-cloud-sdk/bin/gcloud" ]; then
+  GCLOUD_BIN="/opt/homebrew/share/google-cloud-sdk/bin/gcloud"
+elif [ -f "${HOME:-}/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd" ]; then
+  GCLOUD_BIN="${HOME}/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd"
+elif [ -f "/c/Program Files/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd" ]; then
+  GCLOUD_BIN="/c/Program Files/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd"
+else
+  echo "Khong tim thay gcloud. Hay cai Google Cloud CLI hoac set GCLOUD_BIN=/duong/dan/gcloud" >&2
+  exit 1
 fi
 
 "$GCLOUD_BIN" config set project "$PROJECT_ID" >/dev/null
